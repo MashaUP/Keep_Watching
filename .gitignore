@@ -1,0 +1,15 @@
+# Nota: Keep_Watching-<versione>.zip nella radice NON è ignorato:
+# è il pacchetto di installazione e va caricato insieme al codice.
+
+# File di sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python (tools/make_icons.py)
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+.idea/

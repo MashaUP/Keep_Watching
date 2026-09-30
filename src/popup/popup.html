@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <title>Keep_Watching</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="../../icons/icon48.png" alt="" width="28" height="28">
+    <h1>Keep_Watching</h1>
+    <span class="version" id="version"></span>
+  </header>
+
+  <main>
+    <label class="row">
+      <span class="text">
+        <span class="title">Prossimo episodio automatico</span>
+        <span class="hint">A fine episodio passa al successivo</span>
+      </span>
+      <input type="checkbox" class="switch" id="autoNext">
+    </label>
+
+    <label class="row">
+      <span class="text">
+        <span class="title">Avvia il nuovo episodio</span>
+        <span class="hint">Se si carica in pausa, lo fa partire</span>
+      </span>
+      <input type="checkbox" class="switch" id="autoPlay">
+    </label>
+
+    <div class="group" id="nextOptions">
+      <label class="field">
+        <span class="title">Salta i titoli di coda</span>
+        <select id="skipCredits">
+          <option value="0">No, aspetta la fine</option>
+          <option value="15">15 secondi prima della fine</option>
+          <option value="30">30 secondi prima della fine</option>
+          <option value="60">1 minuto prima della fine</option>
+          <option value="90">90 secondi prima della fine</option>
+          <option value="120">2 minuti prima della fine</option>
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="title">Fermati dopo</span>
+        <select id="stopAfter">
+          <option value="0">Nessun limite</option>
+          <option value="1">1 episodio</option>
+          <option value="2">2 episodi</option>
+          <option value="3">3 episodi</option>
+          <option value="5">5 episodi</option>
+          <option value="10">10 episodi</option>
+        </select>
+      </label>
+
+      <div class="streak" id="streakBox">
+        <span id="streakText"></span>
+        <button type="button" id="resetStreak">Azzera</button>
+      </div>
+    </div>
+  </main>
+
+  <script src="../defaults.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
