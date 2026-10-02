@@ -30,8 +30,8 @@
     </label>
 
     <div class="group" id="nextOptions">
-      <label class="field">
-        <span class="title">Salta i titoli di coda</span>
+      <div class="field">
+        <label class="title" for="skipCredits">Salta i titoli di coda</label>
         <select id="skipCredits">
           <option value="0">No, aspetta la fine</option>
           <option value="15">15 secondi prima della fine</option>
@@ -39,8 +39,20 @@
           <option value="60">1 minuto prima della fine</option>
           <option value="90">90 secondi prima della fine</option>
           <option value="120">2 minuti prima della fine</option>
+          <option value="custom">Personalizzato…</option>
         </select>
-      </label>
+        <div class="custom" id="customSkip" hidden>
+          <label class="num">
+            <input type="number" id="skipMin" min="0" max="59" step="1" inputmode="numeric" aria-label="Minuti">
+            <span>min</span>
+          </label>
+          <label class="num">
+            <input type="number" id="skipSec" min="0" max="59" step="1" inputmode="numeric" aria-label="Secondi">
+            <span>sec</span>
+          </label>
+        </div>
+        <p class="hint" id="skipHint" hidden></p>
+      </div>
 
       <label class="field">
         <span class="title">Fermati dopo</span>

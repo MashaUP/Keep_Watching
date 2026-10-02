@@ -13,6 +13,7 @@ Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando i
 7. [Risoluzione dei problemi](#7-risoluzione-dei-problemi)
 8. [Rilasciare una nuova versione](#8-rilasciare-una-nuova-versione)
 9. [Scelte tecniche e alternative scartate](#9-scelte-tecniche-e-alternative-scartate)
+10. [Scheda in background](#10-scheda-in-background)
 
 ---
 
@@ -59,7 +60,8 @@ Dati osservati:
 3. Il sito aggiorna l'URL della pagina principale e ricarica l'iframe intermedio.
 4. Nell'iframe intermedio, il browser inizia a caricare il player; `rules.json` blocca la richiesta.
 5. `autoplay-permission.js` aggiunge `allow="autoplay; fullscreen"` all'iframe e reimposta l'URL con `&kw_autoplay=1`: la regola lo lascia passare.
-6. Il player si carica con il permesso. Di solito JW Player parte da solo; se resta in pausa, `player.js` legge `pendingPlayAt` (valido 30 secondi) e chiama `video.play()`.
+6. Il player si carica con il permesso. Di solito JW Player parte da solo; se resta in pausa, `player.js` legge `pendingPlayAt` (valido 30 secondi), aspetta il video tramite i suoi eventi e chiama `video.play()`.
+7. Se il video non parte o viene rimesso in pausa entro 5 secondi mentre la scheda è nascosta, `player.js` riprova quando la scheda torna visibile (evento `visibilitychange`).
 
 ## 3. Il problema dell'autoplay e la soluzione
 
@@ -195,6 +197,7 @@ window.__kwTest = 1   // poi cambia episodio e riesegui:
 | Il nuovo episodio parte muto | L'autoplay con audio è stato rifiutato (`NotAllowedError` nel log) | Verifica che nel player `allow` sia presente e che il primo play della sessione sia stato fatto a mano. Aggiungi la diagnostica della sezione 5 |
 | Parte muto anche avviando a mano | JW Player ricorda lo stato "muto" | Riattiva l'audio una volta dal controllo del volume del player |
 | Il player si chiude aprendo DevTools | Protezione anti-DevTools | Ctrl+F8 in Sources, poi ricarica |
+| Con la finestra ridotta a icona il cambio episodio non avviene o il nuovo episodio resta fermo | Limiti delle schede in background | Vedi [sezione 10](#10-scheda-in-background) |
 
 ## 8. Rilasciare una nuova versione
 
@@ -204,7 +207,7 @@ window.__kwTest = 1   // poi cambia episodio e riesegui:
    - **major** (**2**.0.0): cambiamento di comportamento incompatibile.
 2. Aggiungi una sezione in `CHANGELOG.md`.
 3. Esegui la checklist di test qui sotto.
-4. Crea il pacchetto: `powershell -ExecutionPolicy Bypass -File tools/package.ps1` (Windows) oppure `sh tools/package.sh` (Linux, macOS, Git Bash). Nella radice viene creato `Keep_Watching-<versione>.zip` con i soli file dell'estensione, e lo zip della versione precedente viene eliminato.
+4. Crea il pacchetto: `powershell -ExecutionPolicy Bypass -File tools/package.ps1` (Windows) oppure `sh tools/package.sh` (Linux, macOS, Git Bash). Nella radice viene creato `Keep_Watching-<versione>.zip`, che contiene la cartella `Keep_Watching/` con i soli file dell'estensione; lo zip della versione precedente viene eliminato.
 5. Aggiorna nel README il nome dello zip nella sezione Installazione e nella struttura del repository.
 6. Commit, tag e push (lo zip va incluso nel commit):
    ```
@@ -226,6 +229,8 @@ Con DevTools aperto, Ctrl+F8 attivo e filtro `Keep_Watching` in Console:
 - [ ] "Fermati dopo 1 episodio" si ferma al secondo finale e il conteggio compare nel menu.
 - [ ] Sull'ultimo episodio disponibile compare `Nessun pulsante "prossimo episodio"` e non succede altro.
 - [ ] Disattivando "Prossimo episodio automatico" l'episodio finisce senza cambi.
+- [ ] "Personalizzato…" con un valore come 3 min 30 s cambia episodio al momento giusto, e riaprendo il menu il valore è ancora lì.
+- [ ] Con la finestra ridotta a icona durante il finale, il cambio episodio avviene e il nuovo episodio parte (o al più parte appena si torna sulla scheda).
 
 Per portare rapidamente un episodio alla fine, trascina la barra di avanzamento agli ultimi secondi.
 
@@ -238,3 +243,22 @@ Per portare rapidamente un episodio alla fine, trascina la barra di avanzamento 
 - **Ricaricare il player senza bloccarlo prima: scartato.** La prima richiesta arriverebbe comunque al server, con il rischio di consumare il token.
 - **Aggiungere il permesso dopo l'inserimento dell'iframe: non basta.** Vedi [sezione 3](#3-il-problema-dellautoplay-e-la-soluzione).
 - **Script agganciati al percorso e non al dominio del sito.** Il dominio principale cambia periodicamente, mentre il percorso (`/it/iframe/`, `/it/watch/`) e il dominio del player sono rimasti stabili.
+
+## 10. Scheda in background
+
+Quando la finestra è ridotta a icona o la scheda non è quella attiva, la pagina diventa "nascosta" (`document.hidden === true`) e Chrome applica alcune limitazioni:
+
+- **Timer rallentati.** `setTimeout` e `setInterval` scattano al massimo una volta al secondo, e dopo alcuni minuti di silenzio anche una volta al minuto. Per questo `player.js` non usa cicli di timer per aspettare il video, ma i suoi eventi (`loadstart`, `loadedmetadata`, `canplay`), che arrivano normalmente.
+- **Eventi del video.** `ended` e `timeupdate` continuano ad arrivare finché il video suona, quindi il rilevamento della fine episodio funziona anche in background.
+- **Avvio automatico di JW Player.** JW Player può essere configurato per avviarsi solo quando il player è visibile sullo schermo. Con la scheda nascosta, quindi, il nuovo episodio può restare fermo finché non interviene `player.js`.
+
+Cosa fa l'estensione: avvia lei il video se è fermo; se il browser o il player lo bloccano (o lo rimettono in pausa entro 5 secondi), riprova appena la scheda torna visibile.
+
+**Come diagnosticare.** Ogni messaggio chiave del log riporta `[scheda visibile]` o `[scheda nascosta]`. Per un test: apri DevTools con Ctrl+F8 e il filtro `Keep_Watching`, porta l'episodio agli ultimi secondi, riduci a icona, aspetta il cambio, poi torna sulla finestra e leggi il log. I messaggi restano perché la pagina principale non si ricarica. Il punto in cui la sequenza si interrompe indica il passaggio da indagare:
+
+| Ultimo messaggio | Significato |
+|---|---|
+| Nessun `passo al successivo` | La fine episodio non è stata rilevata in background |
+| `passo al successivo [scheda nascosta]`, poi nessun `Player caricato con permesso` | Il sito non ha caricato il nuovo episodio finché la scheda era nascosta |
+| `Il video è stato rimesso in pausa subito dopo l'avvio [scheda nascosta]` | Il player mette in pausa i video non visibili |
+| `Nuovo episodio avviato [scheda nascosta]` senza altri messaggi | Tutto ha funzionato in background |

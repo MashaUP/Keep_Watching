@@ -1,6 +1,10 @@
 # Nota: Keep_Watching-<versione>.zip nella radice NON è ignorato:
 # è il pacchetto di installazione e va caricato insieme al codice.
 
+# Generata dal browser quando l'estensione è caricata da questa cartella
+# (versione precompilata di rules.json)
+_metadata/
+
 # File di sistema
 .DS_Store
 Thumbs.db

@@ -5,7 +5,8 @@
  *   Opzioni (modificabili dal popup):
  *     autoNext     boolean  clicca "prossimo episodio" a fine episodio
  *     autoPlay     boolean  avvia il nuovo episodio se si carica in pausa
- *     skipCredits  number   secondi prima della fine in cui cambiare episodio (0 = alla fine)
+ *     skipCredits  number   secondi prima della fine in cui cambiare episodio (0 = alla fine);
+ *                           valori predefiniti nel popup o personalizzati (minuti + secondi)
  *     stopAfter    number   massimo di cambi automatici di fila (0 = nessun limite)
  *   Stato interno (scritto da player.js):
  *     streak        number  cambi automatici fatti di fila

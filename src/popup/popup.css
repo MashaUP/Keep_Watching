@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #15191e;
   --surface: #1f252c;
   --line: #2b323b;
@@ -126,3 +127,35 @@ button:hover { background: rgba(25, 173, 121, 0.2); }
 }
 
 .version { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+/* Anticipo personalizzato per "Salta i titoli di coda" */
+.custom { display: flex; gap: 8px; }
+.custom[hidden], .hint[hidden] { display: none; }
+
+.num {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: text;
+}
+.num:focus-within { outline: 2px solid var(--green); outline-offset: 2px; }
+.num input {
+  width: 100%;
+  min-width: 0;
+  padding: 7px 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.hint { margin: 0; color: var(--muted); font-size: 12px; }

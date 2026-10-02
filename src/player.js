@@ -9,6 +9,12 @@
  *
  * Il passaggio di informazioni tra un episodio e il successivo avviene tramite
  * chrome.storage.local (chiave pendingPlayAt), perché ogni episodio è un documento nuovo.
+ *
+ * Scheda in background (finestra ridotta a icona o scheda non visibile):
+ *   - Chrome rallenta i timer delle schede nascoste: l'attesa del player usa quindi
+ *     gli eventi del <video> e non un ciclo di setTimeout;
+ *   - JW Player può non avviare da solo un video che non è visibile: in quel caso
+ *     l'avvio lo fa questo script, e se non ci riesce riprova quando la scheda torna visibile.
  */
 (() => {
   'use strict';
@@ -23,7 +29,9 @@
   // Finestra entro cui il nuovo episodio considera valido il cambio appena avvenuto.
   const PENDING_PLAY_MS = 30 * 1000;
   // Tempo massimo di attesa perché JW Player colleghi il video alla sorgente.
-  const PLAYER_READY_TIMEOUT_MS = 20 * 1000;
+  const PLAYER_READY_TIMEOUT_MS = 30 * 1000;
+  // Dopo l'avvio, per quanto tempo controllare che il video non venga rimesso in pausa.
+  const PLAY_CHECK_MS = 5 * 1000;
   // Evita che "salta i titoli di coda" scatti su video appena caricati o molto corti.
   const MIN_WATCHED_S = 60;
 
@@ -31,8 +39,8 @@
   let fired = false;
 
   const log = (...a) => console.log(TAG, ...a);
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const isVisible = (el) => el.getClientRects().length > 0;
+  const tabState = () => (document.hidden ? '[scheda nascosta]' : '[scheda visibile]');
 
   chrome.storage.local.get(KW_DEFAULTS).then((s) => { settings = s; });
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -72,7 +80,7 @@
     fired = true;
     if (!(await streakAllowsNext())) return;
 
-    log(`${reason}, passo al successivo.`);
+    log(`${reason}, passo al successivo.`, tabState());
     // Il segnale va salvato prima del click: il nuovo episodio lo leggerà all'avvio.
     await chrome.storage.local.set({ pendingPlayAt: Date.now() });
     btn.click();
@@ -89,6 +97,8 @@
     const v = e.target;
     if (!(v instanceof HTMLVideoElement) || !settings.skipCredits) return;
     if (v.paused || !isFinite(v.duration) || v.currentTime < MIN_WATCHED_S) return;
+    // Un anticipo più lungo dell'episodio stesso (meno il minimo da guardare) viene ignorato.
+    if (v.duration - settings.skipCredits < MIN_WATCHED_S) return;
     if (v.duration - v.currentTime <= settings.skipCredits) goNext('Titoli di coda');
   }, true);
 
@@ -108,20 +118,82 @@
   // Con il permesso di autoplay (autoplay-permission.js) di solito è JW Player stesso
   // ad avviare l'episodio; questa funzione interviene solo se è rimasto in pausa.
 
-  async function waitForVideo(timeoutMs) {
-    const deadline = Date.now() + timeoutMs;
-    while (Date.now() < deadline) {
-      const v = document.querySelector('video');
-      if (v && v.currentSrc) return v;
-      await sleep(300);
+  const findVideo = () => {
+    const v = document.querySelector('video');
+    return v && v.currentSrc ? v : null;
+  };
+
+  // Attende che JW Player colleghi la sorgente al <video>. Basata sugli eventi media,
+  // che arrivano subito anche quando Chrome rallenta i timer della scheda nascosta.
+  function waitForVideo(timeoutMs) {
+    return new Promise((resolve) => {
+      const found = findVideo();
+      if (found) return resolve(found);
+
+      const events = ['loadstart', 'loadedmetadata', 'canplay'];
+      const onEvent = () => { const v = findVideo(); if (v) done(v); };
+      const done = (v) => {
+        events.forEach((ev) => document.removeEventListener(ev, onEvent, true));
+        clearTimeout(timer);
+        resolve(v);
+      };
+      events.forEach((ev) => document.addEventListener(ev, onEvent, true));
+      const timer = setTimeout(() => done(findVideo()), timeoutMs);
+    });
+  }
+
+  // Segnala se il video viene rimesso in pausa subito dopo l'avvio (es. dal player,
+  // perché la scheda non è visibile). In quel caso si riprova quando torna visibile.
+  function watchForEarlyPause(video) {
+    const onPause = () => {
+      log('Il video è stato rimesso in pausa subito dopo l\'avvio.', tabState());
+      if (document.hidden) resumeWhenVisible(video);
+    };
+    video.addEventListener('pause', onPause, { once: true });
+    setTimeout(() => video.removeEventListener('pause', onPause), PLAY_CHECK_MS);
+  }
+
+  function resumeWhenVisible(video) {
+    log('Riprovo l\'avvio quando la scheda torna visibile.');
+    const onVisible = () => {
+      if (document.hidden) return;
+      document.removeEventListener('visibilitychange', onVisible);
+      if (video.paused) startPlayback(video);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+  }
+
+  async function startPlayback(video) {
+    try {
+      await video.play();
+      log('Nuovo episodio avviato.', tabState());
+      watchForEarlyPause(video);
+    } catch (err) {
+      if (err.name !== 'NotAllowedError') {
+        log('Avvio non riuscito:', err.name, err.message, tabState());
+        if (document.hidden) resumeWhenVisible(video);
+        return;
+      }
+
+      // Il browser rifiuta l'avvio con audio: si riparte senza, che è sempre consentito.
+      log('Il browser blocca l\'avvio con audio (NotAllowedError), riprovo senza audio.', tabState());
+      video.muted = true;
+      await chrome.storage.local.set({ mutedByKW: true });
+      try {
+        await video.play();
+        log('Nuovo episodio avviato senza audio.');
+        watchForEarlyPause(video);
+      } catch (e) {
+        log('Avvio non riuscito anche senza audio:', e.name, tabState());
+        if (document.hidden) resumeWhenVisible(video);
+      }
     }
-    return null;
   }
 
   async function autoPlay() {
     const video = await waitForVideo(PLAYER_READY_TIMEOUT_MS);
-    if (!video) return log('Player non pronto in tempo, niente avvio automatico.');
-    if (!video.paused) return log('Il nuovo episodio è già in riproduzione.');
+    if (!video) return log('Player non pronto in tempo, niente avvio automatico.', tabState());
+    if (!video.paused) return log('Il nuovo episodio è già in riproduzione.', tabState());
 
     // Se in un episodio precedente l'audio è stato tolto dall'estensione,
     // JW Player potrebbe ricordarselo: lo riattiviamo.
@@ -131,19 +203,7 @@
       await chrome.storage.local.set({ mutedByKW: false });
     }
 
-    try {
-      await video.play();
-      log('Nuovo episodio avviato.');
-    } catch (err) {
-      if (err.name !== 'NotAllowedError') return log('Avvio non riuscito:', err.name, err.message);
-
-      // Il browser rifiuta l'avvio con audio: si riparte senza, che è sempre consentito.
-      log('Il browser blocca l\'avvio con audio (NotAllowedError), riprovo senza audio.');
-      video.muted = true;
-      await chrome.storage.local.set({ mutedByKW: true });
-      try { await video.play(); log('Nuovo episodio avviato senza audio.'); }
-      catch (e) { log('Avvio non riuscito anche senza audio:', e.name); }
-    }
+    await startPlayback(video);
   }
 
   chrome.storage.local.get({ ...KW_DEFAULTS, pendingPlayAt: 0 }).then((s) => {

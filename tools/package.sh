@@ -1,11 +1,20 @@
 #!/usr/bin/env sh
-# Crea Keep_Watching-<versione>.zip nella radice del repository, con i soli file
-# dell'estensione (manifest.json nella radice dello zip). Rimuove gli zip di versioni precedenti.
+# Crea Keep_Watching-<versione>.zip nella radice del repository.
+# Lo zip contiene la cartella Keep_Watching/ con i soli file dell'estensione:
+# estraendolo si ottiene direttamente la cartella da caricare nel browser.
+# Rimuove gli zip di versioni precedenti.
 # Uso (Linux, macOS, Git Bash su Windows):  sh tools/package.sh
 set -e
 cd "$(dirname "$0")/.."
+REPO=$(pwd)
 VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' manifest.json | head -n 1)
 OUT="Keep_Watching-$VERSION.zip"
+
+STAGE=$(mktemp -d)
+mkdir "$STAGE/Keep_Watching"
+cp -R manifest.json rules.json src icons "$STAGE/Keep_Watching/"
+
 rm -f Keep_Watching-*.zip
-zip -rq "$OUT" manifest.json rules.json src icons
+(cd "$STAGE" && zip -rq "$REPO/$OUT" Keep_Watching)
+rm -rf "$STAGE"
 echo "Creato $OUT"

@@ -10,18 +10,20 @@ Il player del sito ha un pulsante "prossimo episodio", ma a fine puntata non suc
 
 - **Prossimo episodio automatico**: a fine episodio clicca il pulsante "prossimo episodio" del player. Sull'ultimo episodio disponibile non fa nulla.
 - **Avvio del nuovo episodio**: il nuovo episodio parte da solo e con l'audio, anche quando il cambio lo fai tu a mano.
-- **Salta i titoli di coda**: cambia episodio da 15 secondi a 2 minuti prima della fine.
+- **Salta i titoli di coda**: cambia episodio da 15 secondi a 2 minuti prima della fine, oppure con un anticipo personalizzato in minuti e secondi.
 - **Fermati dopo N episodi**: si ferma dopo un certo numero di cambi automatici di fila, utile se ti addormenti.
 - **Dominio che cambia**: continua a funzionare quando il sito cambia dominio (`.fun`, `.xyz` e così via).
 
 ## Installazione
 
-Il modo più rapido è usare lo zip pronto nella radice del repository, **`Keep_Watching-1.0.0.zip`**, che contiene solo i file dell'estensione.
+Il modo più rapido è usare lo zip pronto nella radice del repository, **`Keep_Watching-1.1.0.zip`**. Contiene la cartella `Keep_Watching` con i soli file dell'estensione.
 
-1. Scarica `Keep_Watching-1.0.0.zip` ed estrailo (per esempio con "Estrai tutto" o "Estrai in Keep_Watching-1.0.0\"). Tieni la cartella estratta: il browser carica l'estensione da lì ogni volta.
+1. Scarica `Keep_Watching-1.1.0.zip` ed estrailo con "Estrai qui": ottieni la cartella `Keep_Watching`. Tienila: il browser carica l'estensione da lì ogni volta.
 2. Apri `chrome://extensions` (su Brave `brave://extensions`).
 3. Attiva **Modalità sviluppatore** in alto a destra.
-4. Clicca **Carica estensione non pacchettizzata** e seleziona la cartella estratta, quella che contiene `manifest.json`.
+4. Clicca **Carica estensione non pacchettizzata** e seleziona la cartella `Keep_Watching`, quella che contiene `manifest.json`.
+
+Al primo avvio il browser crea dentro la cartella una sottocartella `_metadata`: è normale, contiene una versione precompilata delle regole di rete.
 
 In alternativa si può clonare il repository e selezionare direttamente la sua cartella: funziona allo stesso modo.
 
@@ -41,8 +43,10 @@ Le opzioni si cambiano cliccando l'icona di Keep_Watching nella barra del browse
 |---|---|---|
 | Prossimo episodio automatico | Passa al successivo a fine episodio | Attivo |
 | Avvia il nuovo episodio | Fa partire il nuovo episodio se si carica in pausa | Attivo |
-| Salta i titoli di coda | Cambia episodio N secondi prima della fine | No |
+| Salta i titoli di coda | Cambia episodio prima della fine: valori pronti fino a 2 minuti, oppure **Personalizzato…** con minuti e secondi | No |
 | Fermati dopo | Numero massimo di cambi automatici di fila | Nessun limite |
+
+L'estensione funziona anche con la finestra ridotta a icona. Se in quel caso il browser non lascia partire il nuovo episodio, l'avvio viene ripetuto appena torni sulla scheda.
 
 Il conteggio di "Fermati dopo" riparte da zero dopo 3 ore senza cambi automatici, oppure con il pulsante **Azzera** nel menu.
 
@@ -75,7 +79,7 @@ L'estensione non raccoglie né invia dati: non fa richieste di rete proprie e us
 ## Struttura del repository
 
 ```
-Keep_Watching-1.0.0.zip     pacchetto pronto da installare (solo i file dell'estensione)
+Keep_Watching-1.1.0.zip     pacchetto pronto da installare (cartella Keep_Watching con i soli file dell'estensione)
 manifest.json               configurazione dell'estensione (Manifest V3)
 rules.json                  regola di rete per il permesso di autoplay
 src/
