@@ -28,8 +28,9 @@
 
   function patch(frame) {
     const src = frame.getAttribute('src') || '';
-    // Un iframe senza URL potrebbe diventare il player: gli si dà comunque il permesso.
-    if (src !== '' && !src.includes(PLAYER_HOST)) return;
+    // Solo l'iframe del player. Se il sito ne assegna l'URL in un secondo momento,
+    // la modifica di src fa ripassare l'iframe da qui.
+    if (!src.includes(PLAYER_HOST)) return;
 
     // 1. Permesso, prima di toccare l'URL.
     const current = (frame.getAttribute('allow') || '')
@@ -39,7 +40,7 @@
 
     // 2. Nuovo caricamento con il marcatore che rules.json lascia passare.
     //    La modifica di src riattiva l'observer, ma il marcatore evita il loop.
-    if (src.includes(PLAYER_HOST) && !src.includes(MARK)) {
+    if (!src.includes(MARK)) {
       frame.setAttribute('src', src + (src.includes('?') ? '&' : '?') + MARK);
       console.log(TAG, 'Player caricato con permesso:', frame.getAttribute('allow'));
     }

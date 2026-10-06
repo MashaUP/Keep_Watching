@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Keep_Watching",
-  "version": "1.1.0",
-  "description": "Passa automaticamente all'episodio successivo su StreamingCommunity e lo avvia con l'audio.",
+  "version": "1.2.1",
+  "description": "Su StreamingCommunity passa da solo all'episodio successivo, con conto alla rovescia, avvio con audio e schermo intero.",
   "permissions": [
     "storage",
-    "declarativeNetRequest"
+    "declarativeNetRequest",
+    "notifications"
   ],
   "icons": {
     "16": "icons/icon16.png",
@@ -19,6 +20,17 @@
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "commands": {
+    "toggle-enabled": {
+      "suggested_key": {
+        "default": "Alt+Shift+K"
+      },
+      "description": "Attiva o sospendi Keep_Watching"
     }
   },
   "declarative_net_request": {
@@ -38,6 +50,7 @@
       ],
       "js": [
         "src/defaults.js",
+        "src/panel.js",
         "src/player.js"
       ],
       "all_frames": true,
@@ -49,7 +62,8 @@
         "*://*/*/watch/*"
       ],
       "js": [
-        "src/autoplay-permission.js"
+        "src/autoplay-permission.js",
+        "src/cinema.js"
       ],
       "all_frames": true,
       "run_at": "document_start"

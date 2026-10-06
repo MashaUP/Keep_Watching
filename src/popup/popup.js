@@ -2,7 +2,8 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const toggles = ['autoNext', 'autoPlay'];
+  const toggles = ['enabled', 'autoNext', 'autoPlay', 'keepFullscreen', 'notifyEnd'];
+  const selects = ['countdown', 'stopAfter'];
 
   // Valori in secondi presenti nel menu "Salta i titoli di coda".
   const SKIP_PRESETS = [0, 15, 30, 60, 90, 120];
@@ -48,8 +49,9 @@
 
   function render(s) {
     toggles.forEach((k) => { $(k).checked = s[k]; });
+    selects.forEach((k) => { $(k).value = String(s[k]); });
     renderSkip(s.skipCredits);
-    $('stopAfter').value = String(s.stopAfter);
+    $('options').classList.toggle('disabled', !s.enabled);
     $('nextOptions').classList.toggle('disabled', !s.autoNext);
     renderStreak(s);
   }
@@ -65,6 +67,10 @@
 
   toggles.forEach((k) => $(k).addEventListener('change', (e) => {
     chrome.storage.local.set({ [k]: e.target.checked });
+  }));
+
+  selects.forEach((k) => $(k).addEventListener('change', (e) => {
+    chrome.storage.local.set({ [k]: Number(e.target.value) });
   }));
 
   $('skipCredits').addEventListener('change', (e) => {
@@ -92,12 +98,16 @@
     });
   });
 
-  $('stopAfter').addEventListener('change', (e) => {
-    chrome.storage.local.set({ stopAfter: Number(e.target.value) });
-  });
-
   $('resetStreak').addEventListener('click', () => {
     chrome.storage.local.set({ streak: 0, lastAutoAt: 0 });
+  });
+
+  // Scorciatoia attuale per l'interruttore rapido (modificabile dalle impostazioni del browser).
+  chrome.commands.getAll().then((commands) => {
+    const cmd = commands.find((c) => c.name === 'toggle-enabled');
+    $('shortcutHint').textContent = cmd && cmd.shortcut
+      ? `Scorciatoia: ${cmd.shortcut}`
+      : 'Scorciatoia non impostata';
   });
 
   $('version').textContent = 'v' + chrome.runtime.getManifest().version;

@@ -1,6 +1,6 @@
 # Manutenzione di Keep_Watching
 
-Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando il sito cambia e come diagnosticare i problemi. Ogni informazione qui è stata verificata sul sito durante lo sviluppo (settembre 2026, JW Player 8.36.4).
+Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando il sito cambia e come diagnosticare i problemi. Le informazioni sul sito sono state verificate sul sito reale durante lo sviluppo (settembre 2026, JW Player 8.36.4); le funzioni aggiunte nella 1.2 sono state provate anche su un sito di prova con la stessa struttura (vedi [sezione 11](#11-schermo-intero-tra-episodi-notifiche-e-badge)).
 
 ## Indice
 
@@ -14,6 +14,7 @@ Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando i
 8. [Rilasciare una nuova versione](#8-rilasciare-una-nuova-versione)
 9. [Scelte tecniche e alternative scartate](#9-scelte-tecniche-e-alternative-scartate)
 10. [Scheda in background](#10-scheda-in-background)
+11. [Schermo intero tra episodi, notifiche e badge](#11-schermo-intero-tra-episodi-notifiche-e-badge)
 
 ---
 
@@ -47,21 +48,28 @@ Dati osservati:
 
 | File | Dove gira | Compito |
 |---|---|---|
-| `src/player.js` | Player (`vixcloud.co/embed/*`) | Rileva la fine dell'episodio, clicca "prossimo episodio", avvia il nuovo episodio |
+| `src/player.js` | Player (`vixcloud.co/embed/*`) | Rileva la fine dell'episodio, gestisce conto alla rovescia, limite e notifiche, clicca "prossimo episodio", avvia il nuovo episodio |
+| `src/panel.js` | Player (`vixcloud.co/embed/*`) | Riquadro sul player usato da `player.js` (conto alla rovescia e domande), con stile isolato in Shadow DOM |
 | `src/autoplay-permission.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | Aggiunge `allow="autoplay"` all'iframe del player e lo ricarica con il marcatore |
+| `src/cinema.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | In modalità cinema allarga a tutta la finestra l'iframe che porta al player; Esc per uscire |
+| `src/background.js` | Service worker | Badge, scorciatoia `toggle-enabled`, notifiche, schermo intero della finestra |
 | `rules.json` | Rete del browser | Blocca il caricamento del player senza marcatore `kw_autoplay=1` |
-| `src/defaults.js` | Player e popup | Opzioni predefinite; documenta tutte le chiavi di `chrome.storage.local` |
+| `src/defaults.js` | Service worker, player e popup | Opzioni predefinite; documenta tutte le chiavi di `chrome.storage.local` |
 | `src/popup/*` | Menu dell'icona | Legge e salva le opzioni |
+
+Nel player, `defaults.js`, `panel.js` e `player.js` vengono caricati in quest'ordine (vedi `manifest.json`) e condividono le stesse variabili globali: `player.js` usa `KW_DEFAULTS` e `kwCreatePanel` definiti negli altri due.
 
 ### Flusso di un cambio episodio
 
 1. Il video finisce: `player.js` riceve l'evento `ended` (oppure `timeupdate` se "salta i titoli di coda" è attivo).
-2. `player.js` controlla il limite "fermati dopo", salva `pendingPlayAt` in `chrome.storage.local` e clicca `.next-episode`.
-3. Il sito aggiorna l'URL della pagina principale e ricarica l'iframe intermedio.
-4. Nell'iframe intermedio, il browser inizia a caricare il player; `rules.json` blocca la richiesta.
-5. `autoplay-permission.js` aggiunge `allow="autoplay; fullscreen"` all'iframe e reimposta l'URL con `&kw_autoplay=1`: la regola lo lascia passare.
-6. Il player si carica con il permesso. Di solito JW Player parte da solo; se resta in pausa, `player.js` legge `pendingPlayAt` (valido 30 secondi), aspetta il video tramite i suoi eventi e chiama `video.play()`.
-7. Se il video non parte o viene rimesso in pausa entro 5 secondi mentre la scheda è nascosta, `player.js` riprova quando la scheda torna visibile (evento `visibilitychange`).
+2. Se il pulsante `.next-episode` non c'è, `player.js` chiede una notifica di fine episodi (o di pulsante non trovato, se l'URL ha `nextEpisode=1`).
+3. Se il limite "chiedi se continuare" è raggiunto, mostra la domanda sul player e si ferma lì finché non si risponde.
+4. Altrimenti mostra il conto alla rovescia; alla scadenza (o con "Vai ora") aggiorna il conteggio, salva `pendingPlayAt`, passa alla modalità cinema se il player è a schermo intero e clicca `.next-episode`.
+5. Il sito aggiorna l'URL della pagina principale e ricarica l'iframe intermedio.
+6. Nell'iframe intermedio, il browser inizia a caricare il player; `rules.json` blocca la richiesta.
+7. `autoplay-permission.js` aggiunge `allow="autoplay; fullscreen"` all'iframe e reimposta l'URL con `&kw_autoplay=1`: la regola lo lascia passare.
+8. Il player si carica con il permesso. Di solito JW Player parte da solo; se resta in pausa, `player.js` legge `pendingPlayAt` (valido 30 secondi), aspetta il video tramite i suoi eventi e chiama `video.play()`.
+9. Se il video non parte o viene rimesso in pausa entro 5 secondi mentre la scheda è nascosta, `player.js` riprova quando la scheda torna visibile (evento `visibilitychange`).
 
 ## 3. Il problema dell'autoplay e la soluzione
 
@@ -87,7 +95,10 @@ Questa è la parte più delicata dell'estensione ed è stata la più difficile d
 | Dominio del player `vixcloud.co` | `manifest.json` (primo `matches`), `rules.json` (`requestDomains`), `autoplay-permission.js` (`PLAYER_HOST`) | L'estensione non fa più nulla |
 | Percorso `/embed/` del player | `manifest.json`, `rules.json` (`urlFilter`) | L'estensione non fa più nulla |
 | Percorso `/iframe/` o `/watch/` delle pagine del sito | `manifest.json` (secondo `matches`) | **Il player non si carica** (bloccato da `rules.json`) |
-| Classe `.next-episode` nella barra `.jw-controlbar` | `player.js` (`NEXT_SELECTOR`) | Log "Nessun pulsante prossimo episodio" anche a metà serie |
+| Classe `.next-episode` nella barra `.jw-controlbar` | `player.js` (`NEXT_SELECTOR`) | Notifica "pulsante non trovato" a fine episodio |
+| Parametri `t`, `d`, `nextEpisode` nell'URL del player | `player.js` (`episodeInfo`) | Notifiche senza titolo; il controllo "pulsante non trovato" non scatta |
+| Contenitore `.jwplayer` (elemento a schermo intero) | `player.js` (`PLAYER_SELECTOR`) | Il conto alla rovescia non si vede a schermo intero |
+| Pulsante `.jw-icon-fullscreen` | `player.js` (`FULLSCREEN_SELECTOR`) | In modalità cinema il pulsante non fa uscire (Esc funziona comunque) |
 | JW Player usa un unico `<video>` con eventi standard | `player.js` | Fine episodio non rilevata |
 | Il parametro in più `kw_autoplay=1` è accettato dal server | `autoplay-permission.js` (`MARK`) | Il player dà errore dopo il caricamento |
 
@@ -197,6 +208,10 @@ window.__kwTest = 1   // poi cambia episodio e riesegui:
 | Il nuovo episodio parte muto | L'autoplay con audio è stato rifiutato (`NotAllowedError` nel log) | Verifica che nel player `allow` sia presente e che il primo play della sessione sia stato fatto a mano. Aggiungi la diagnostica della sezione 5 |
 | Parte muto anche avviando a mano | JW Player ricorda lo stato "muto" | Riattiva l'audio una volta dal controllo del volume del player |
 | Il player si chiude aprendo DevTools | Protezione anti-DevTools | Ctrl+F8 in Sources, poi ricarica |
+| Il conto alla rovescia non compare | Opzione su "No, cambia subito", oppure `.jwplayer` cambiato | Controlla il menu; poi cerca nel player il contenitore che va a schermo intero |
+| Notifica "pulsante non trovato" | Il sito ha cambiato la barra dei controlli | Usa il comando "Pulsanti della barra" e aggiorna `NEXT_SELECTOR` |
+| Nessuna notifica | Notifiche disattivate nel menu, nel browser o nel sistema operativo | Controlla le impostazioni di notifica di Windows per Brave |
+| Bloccato a schermo intero dopo la fine della serie | Modalità cinema rimasta attiva | Premi Esc o F11 |
 | Con la finestra ridotta a icona il cambio episodio non avviene o il nuovo episodio resta fermo | Limiti delle schede in background | Vedi [sezione 10](#10-scheda-in-background) |
 
 ## 8. Rilasciare una nuova versione
@@ -207,9 +222,8 @@ window.__kwTest = 1   // poi cambia episodio e riesegui:
    - **major** (**2**.0.0): cambiamento di comportamento incompatibile.
 2. Aggiungi una sezione in `CHANGELOG.md`.
 3. Esegui la checklist di test qui sotto.
-4. Crea il pacchetto: `powershell -ExecutionPolicy Bypass -File tools/package.ps1` (Windows) oppure `sh tools/package.sh` (Linux, macOS, Git Bash). Nella radice viene creato `Keep_Watching-<versione>.zip`, che contiene la cartella `Keep_Watching/` con i soli file dell'estensione; lo zip della versione precedente viene eliminato.
-5. Aggiorna nel README il nome dello zip nella sezione Installazione e nella struttura del repository.
-6. Commit, tag e push (lo zip va incluso nel commit):
+4. Crea il pacchetto: `powershell -ExecutionPolicy Bypass -File tools/package.ps1` (Windows) oppure `sh tools/package.sh` (Linux, macOS, Git Bash). Nella radice viene creato `Keep_Watching-<versione>.zip`, che contiene la cartella `Keep_Watching/` con i soli file dell'estensione; lo zip della versione precedente viene eliminato e il nome dello zip nel README viene aggiornato.
+5. Commit, tag e push (lo zip va incluso nel commit):
    ```
    git add -A
    git commit -m "v1.0.1: <descrizione>"
@@ -226,9 +240,13 @@ Con DevTools aperto, Ctrl+F8 attivo e filtro `Keep_Watching` in Console:
 - [ ] Il nuovo episodio parte **con l'audio** senza toccare nulla.
 - [ ] Un click manuale su "prossimo episodio" fa partire il nuovo episodio da solo.
 - [ ] "Salta i titoli di coda" cambia episodio al momento scelto.
-- [ ] "Fermati dopo 1 episodio" si ferma al secondo finale e il conteggio compare nel menu.
-- [ ] Sull'ultimo episodio disponibile compare `Nessun pulsante "prossimo episodio"` e non succede altro.
+- [ ] Sull'ultimo episodio disponibile compare `Nessun altro episodio disponibile` e non succede altro.
 - [ ] Disattivando "Prossimo episodio automatico" l'episodio finisce senza cambi.
+- [ ] Il conto alla rovescia compare a fine episodio; "Annulla" lo ferma, "Vai ora" cambia subito.
+- [ ] A schermo intero, dopo il cambio episodio si resta a schermo intero; Esc e il pulsante schermo intero del player escono.
+- [ ] "Chiedi se continuare dopo 1 episodio": al secondo finale compare la domanda; "Continua" va avanti, "Basta così" si ferma.
+- [ ] Il badge mostra "1/1" durante il limite e "OFF" con Alt+Shift+K; la scorciatoia riattiva l'estensione.
+- [ ] Sull'ultimo episodio arriva la notifica; cliccandola si torna alla scheda.
 - [ ] "Personalizzato…" con un valore come 3 min 30 s cambia episodio al momento giusto, e riaprendo il menu il valore è ancora lì.
 - [ ] Con la finestra ridotta a icona durante il finale, il cambio episodio avviene e il nuovo episodio parte (o al più parte appena si torna sulla scheda).
 
@@ -262,3 +280,34 @@ Cosa fa l'estensione: avvia lei il video se è fermo; se il browser o il player 
 | `passo al successivo [scheda nascosta]`, poi nessun `Player caricato con permesso` | Il sito non ha caricato il nuovo episodio finché la scheda era nascosta |
 | `Il video è stato rimesso in pausa subito dopo l'avvio [scheda nascosta]` | Il player mette in pausa i video non visibili |
 | `Nuovo episodio avviato [scheda nascosta]` senza altri messaggi | Tutto ha funzionato in background |
+
+## 11. Schermo intero tra episodi, notifiche e badge
+
+### Schermo intero tra episodi ("modalità cinema")
+
+Il browser concede lo schermo intero di un elemento (`requestFullscreen`) solo in risposta a un click dell'utente. Al cambio episodio l'iframe del player viene distrutto, lo schermo intero si perde e il nuovo player non può richiederlo.
+
+Soluzione, in tre pezzi:
+1. **`player.js`**, al momento del cambio, se il player è a schermo intero e l'opzione è attiva: esce dallo schermo intero, aspetta l'evento `fullscreenchange` e chiede al service worker `enterCinema`.
+2. **`background.js`** salva lo stato della finestra (`cinemaPrevState`), imposta `cinema: true` e mette la finestra a schermo intero con `chrome.windows.update(…, { state: 'fullscreen' })`, che non richiede un click.
+3. **`cinema.js`**, nella pagina principale e nell'iframe intermedio, vede `cinema: true` e rende `position: fixed` a tutta finestra l'iframe che porta al player.
+
+Uscita dalla modalità (tutte portano a `exitCinema`, che ripristina lo stato della finestra):
+- Esc, in qualunque dei tre documenti;
+- il pulsante schermo intero del player (i suoi eventi vengono bloccati prima che arrivino a JW Player);
+- F11 o altri cambi di stato della finestra (`windows.onBoundsChanged`, ignorato per 2,5 secondi dopo l'attivazione);
+- fine degli episodi, "Basta così" al limite, uscita dalla pagina dell'episodio, sospensione dell'estensione o disattivazione dell'opzione.
+
+### Notifiche
+
+Le chiede `player.js` con un messaggio `notify` al service worker, che usa `chrome.notifications` e ricorda la scheda di provenienza in `chrome.storage.session`: cliccando la notifica si torna a quella scheda. Titolo ed episodio vengono dai parametri `t` e `d` dell'URL del player, codificati in base64.
+
+Il controllo "pulsante non trovato" si basa su `nextEpisode=1` nell'URL del player. Durante lo sviluppo il parametro era presente quando esisteva un episodio successivo; il suo comportamento sull'ultimo episodio non è stato verificato sul sito reale.
+
+### Badge e scorciatoia
+
+Il badge viene aggiornato dal service worker a ogni cambio di `enabled`, `stopAfter`, `streak` o `lastAutoAt`. La scorciatoia è il comando `toggle-enabled` in `manifest.json`; il browser la assegna solo se non è già usata da un'altra estensione.
+
+### Test senza il sito reale
+
+Durante lo sviluppo della 1.2.0 le funzioni sono state provate su un sito finto con la stessa struttura a tre livelli (pagina, iframe intermedio, player su `vixcloud.co` reindirizzato in locale): conto alla rovescia, annulla, limite con domanda, badge, notifica di fine episodi, modalità cinema con entrata da schermo intero e uscita con Esc o con il pulsante del player.

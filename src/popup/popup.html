@@ -12,7 +12,17 @@
     <span class="version" id="version"></span>
   </header>
 
-  <main>
+  <section class="master">
+    <label class="row">
+      <span class="text">
+        <span class="title">Estensione attiva</span>
+        <span class="hint" id="shortcutHint"></span>
+      </span>
+      <input type="checkbox" class="switch" id="enabled">
+    </label>
+  </section>
+
+  <main id="options">
     <label class="row">
       <span class="text">
         <span class="title">Prossimo episodio automatico</span>
@@ -29,7 +39,34 @@
       <input type="checkbox" class="switch" id="autoPlay">
     </label>
 
+    <label class="row">
+      <span class="text">
+        <span class="title">Resta a schermo intero</span>
+        <span class="hint">Tra un episodio e l'altro. Esc per uscire</span>
+      </span>
+      <input type="checkbox" class="switch" id="keepFullscreen">
+    </label>
+
+    <label class="row">
+      <span class="text">
+        <span class="title">Notifiche sul desktop</span>
+        <span class="hint">A fine episodi e al limite di episodi</span>
+      </span>
+      <input type="checkbox" class="switch" id="notifyEnd">
+    </label>
+
     <div class="group" id="nextOptions">
+      <label class="field">
+        <span class="title">Conto alla rovescia</span>
+        <select id="countdown">
+          <option value="0">No, cambia subito</option>
+          <option value="5">5 secondi</option>
+          <option value="10">10 secondi</option>
+          <option value="15">15 secondi</option>
+          <option value="20">20 secondi</option>
+        </select>
+      </label>
+
       <div class="field">
         <label class="title" for="skipCredits">Salta i titoli di coda</label>
         <select id="skipCredits">
@@ -54,17 +91,17 @@
         <p class="hint" id="skipHint" hidden></p>
       </div>
 
-      <label class="field">
-        <span class="title">Fermati dopo</span>
+      <div class="field">
+        <label class="title" for="stopAfter">Chiedi se continuare dopo</label>
         <select id="stopAfter">
-          <option value="0">Nessun limite</option>
+          <option value="0">Mai, continua sempre</option>
           <option value="1">1 episodio</option>
           <option value="2">2 episodi</option>
           <option value="3">3 episodi</option>
           <option value="5">5 episodi</option>
           <option value="10">10 episodi</option>
         </select>
-      </label>
+      </div>
 
       <div class="streak" id="streakBox">
         <span id="streakText"></span>

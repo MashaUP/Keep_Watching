@@ -10,6 +10,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 body {
   width: 310px;
@@ -19,6 +20,8 @@ body {
   font: 13px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
+/* ---------- Intestazione e interruttore generale ---------- */
+
 header {
   display: flex;
   align-items: center;
@@ -26,10 +29,18 @@ header {
   padding: 14px 16px;
   border-bottom: 1px solid var(--line);
 }
-
 h1 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: 0.01em; }
+.version { margin-left: auto; color: var(--muted); font-size: 11px; }
+
+.master { border-bottom: 1px solid var(--line); }
+.master .row { padding: 12px 16px; }
 
 main { padding: 6px 0 10px; }
+
+/* Opzioni non applicabili (estensione sospesa, prossimo episodio disattivato) */
+.disabled { opacity: 0.4; pointer-events: none; }
+
+/* ---------- Righe con interruttore ---------- */
 
 .row {
   display: flex;
@@ -43,18 +54,17 @@ main { padding: 6px 0 10px; }
 
 .text { display: flex; flex-direction: column; gap: 2px; }
 .title { font-weight: 550; }
-.hint { color: var(--muted); font-size: 12px; }
+.hint { margin: 0; color: var(--muted); font-size: 12px; }
 
-/* Interruttore */
 .switch {
-  appearance: none;
+  position: relative;
   flex: none;
   width: 36px;
   height: 20px;
   margin: 0;
   border-radius: 10px;
   background: var(--line);
-  position: relative;
+  appearance: none;
   cursor: pointer;
   transition: background 0.15s;
 }
@@ -71,10 +81,8 @@ main { padding: 6px 0 10px; }
 }
 .switch:checked { background: var(--green); }
 .switch:checked::after { transform: translateX(16px); }
-.switch:focus-visible, select:focus-visible, button:focus-visible {
-  outline: 2px solid var(--green);
-  outline-offset: 2px;
-}
+
+/* ---------- Opzioni del cambio episodio ---------- */
 
 .group {
   margin: 6px 16px 0;
@@ -82,7 +90,6 @@ main { padding: 6px 0 10px; }
   border-top: 1px solid var(--line);
   transition: opacity 0.15s;
 }
-.group.disabled { opacity: 0.4; pointer-events: none; }
 
 .field { display: flex; flex-direction: column; gap: 6px; padding: 8px 0; }
 
@@ -97,41 +104,8 @@ select {
   cursor: pointer;
 }
 
-.streak {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 6px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: var(--green-soft);
-  color: var(--text);
-  font-size: 12px;
-}
-.streak[hidden] { display: none; }
-
-button {
-  border: 0;
-  padding: 3px 8px;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--green);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-button:hover { background: rgba(25, 173, 121, 0.2); }
-
-@media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; }
-}
-
-.version { margin-left: auto; color: var(--muted); font-size: 11px; }
-
-/* Anticipo personalizzato per "Salta i titoli di coda" */
+/* Anticipo personalizzato (minuti e secondi) */
 .custom { display: flex; gap: 8px; }
-.custom[hidden], .hint[hidden] { display: none; }
-
 .num {
   flex: 1;
   display: flex;
@@ -145,7 +119,6 @@ button:hover { background: rgba(25, 173, 121, 0.2); }
   font-size: 12px;
   cursor: text;
 }
-.num:focus-within { outline: 2px solid var(--green); outline-offset: 2px; }
 .num input {
   width: 100%;
   min-width: 0;
@@ -158,4 +131,40 @@ button:hover { background: rgba(25, 173, 121, 0.2); }
   font-size: 13px;
 }
 
-.hint { margin: 0; color: var(--muted); font-size: 12px; }
+/* Conteggio degli episodi di fila */
+.streak {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--green-soft);
+  font-size: 12px;
+}
+
+button {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--green);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover { background: rgba(25, 173, 121, 0.2); }
+
+/* ---------- Focus da tastiera e animazioni ---------- */
+
+.switch:focus-visible,
+select:focus-visible,
+button:focus-visible,
+.num:focus-within {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
