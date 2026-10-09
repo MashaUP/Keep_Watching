@@ -123,6 +123,10 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'exitCinema':
         await exitCinema();
         break;
+      case 'reloadEpisode':
+        // Inoltrato a tutti i frame della scheda: risponde solo l'iframe intermedio (recovery.js).
+        if (sender.tab) await chrome.tabs.sendMessage(sender.tab.id, { type: 'kwReloadEpisode', minute: msg.minute });
+        break;
     }
   })().then(() => sendResponse({ ok: true }), (err) => sendResponse({ ok: false, error: String(err) }));
   return true; // risposta asincrona

@@ -3,6 +3,17 @@
 Tutte le modifiche rilevanti del progetto sono elencate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e le versioni seguono il [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.3.0] - 2026-10-09
+
+### Aggiunto
+- **Salto intro per serie**: con il pulsante "Fine intro qui" sul player si segna la fine dell'intro; negli episodi successivi della serie viene saltata da sola, con un riquadro "Intro saltata" e il pulsante "Annulla". Non scatta se l'episodio riparte da un punto preciso (`minute=` o ricarica).
+- **Titoli di coda per serie**: "Inizio titoli qui" salva per la serie quanti secondi prima della fine iniziano i titoli; ha la precedenza sul valore generale.
+- **Barra di pulsanti sul player** (`src/toolbar.js`): "Salta intro", "+60 s", "Fine intro qui", "Inizio titoli qui", "Stop a fine episodio". Compare muovendo il mouse sul video.
+- **Timer di spegnimento**: dopo 15–90 minuti, alla fine dell'episodio o alla fine della stagione, con dissolvenza del volume negli ultimi 30 secondi (opzionale). Il volume viene ripristinato a video fermo.
+- **Streaming bloccato**: se il video non avanza per 12 secondi viene fatto un salto di 1 secondo; se non basta, l'episodio viene ricaricato tramite l'iframe del sito con `minute=` e riportato al secondo in cui suonava (`src/recovery.js`). Se si blocca di nuovo entro 3 minuti arriva una notifica.
+- **Pausa quando cambi scheda** (facoltativa, disattivata di default).
+- Nel menu: sezioni, timer di spegnimento con orario di fine, elenco delle serie salvate con "Rimuovi".
+
 ## [1.2.1] - 2026-10-05
 
 Versione di manutenzione: nessuna funzione nuova, comportamento invariato.

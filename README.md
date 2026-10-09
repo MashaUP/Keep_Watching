@@ -12,6 +12,12 @@ Il player del sito ha un pulsante "prossimo episodio", ma a fine puntata non suc
 - **Avvio del nuovo episodio**: il nuovo episodio parte da solo e con l'audio, anche quando il cambio lo fai tu a mano.
 - **Resta a schermo intero**: se guardi a schermo intero, ci resti anche nell'episodio successivo.
 - **Salta i titoli di coda**: cambia episodio da 15 secondi a 2 minuti prima della fine, oppure con un anticipo personalizzato in minuti e secondi.
+- **Salta l'intro, serie per serie**: segni la fine dell'intro una volta dal player ("Fine intro qui") e dagli episodi successivi viene saltata da sola, con la possibilità di annullare.
+- **Titoli di coda per serie**: con "Inizio titoli qui" il cambio episodio avviene al momento giusto per quella serie.
+- **Barra di pulsanti sul player**: "Salta intro", "+60 s", "Fine intro qui", "Inizio titoli qui" e "Stop a fine episodio", visibili quando muovi il mouse sul video.
+- **Timer di spegnimento**: ferma il video dopo 15–90 minuti, alla fine dell'episodio o alla fine della stagione, abbassando il volume negli ultimi 30 secondi.
+- **Riparte se lo streaming si blocca**: prima un piccolo salto in avanti, poi ricarica l'episodio dal punto in cui eri.
+- **Pausa quando cambi scheda** (facoltativa): riprende quando torni sul video.
 - **Chiedi se continuare dopo N episodi**: dopo un certo numero di episodi di fila chiede se andare avanti, utile se ti addormenti.
 - **Notifiche sul desktop**: quando la serie è finita o quando serve una tua risposta.
 - **Interruttore rapido**: attivi o sospendi l'estensione con Alt+Shift+K; il badge sull'icona mostra "OFF" quando è sospesa.
@@ -19,9 +25,9 @@ Il player del sito ha un pulsante "prossimo episodio", ma a fine puntata non suc
 
 ## Installazione
 
-Il modo più rapido è usare lo zip pronto nella radice del repository, **`Keep_Watching-1.2.1.zip`**. Contiene la cartella `Keep_Watching` con i soli file dell'estensione.
+Il modo più rapido è usare lo zip pronto nella radice del repository, **`Keep_Watching-1.3.0.zip`**. Contiene la cartella `Keep_Watching` con i soli file dell'estensione.
 
-1. Scarica `Keep_Watching-1.2.1.zip` ed estrailo con "Estrai qui": ottieni la cartella `Keep_Watching`. Tienila: il browser carica l'estensione da lì ogni volta.
+1. Scarica `Keep_Watching-1.3.0.zip` ed estrailo con "Estrai qui": ottieni la cartella `Keep_Watching`. Tienila: il browser carica l'estensione da lì ogni volta.
 2. Apri `chrome://extensions` (su Brave `brave://extensions`).
 3. Attiva **Modalità sviluppatore** in alto a destra.
 4. Clicca **Carica estensione non pacchettizzata** e seleziona la cartella `Keep_Watching`, quella che contiene `manifest.json`.
@@ -48,10 +54,29 @@ Le opzioni si cambiano cliccando l'icona di Keep_Watching nella barra del browse
 | Prossimo episodio automatico | Passa al successivo a fine episodio | Attivo |
 | Avvia il nuovo episodio | Fa partire il nuovo episodio se si carica in pausa | Attivo |
 | Resta a schermo intero | Mantiene lo schermo intero tra un episodio e l'altro | Attivo |
-| Notifiche sul desktop | Avvisi a fine episodi e al limite di episodi | Attivo |
 | Conto alla rovescia | Secondi prima del cambio, con "Annulla" e "Vai ora" | 10 secondi |
-| Salta i titoli di coda | Cambia episodio prima della fine: valori pronti fino a 2 minuti, oppure **Personalizzato…** con minuti e secondi | No |
+| Salta i titoli di coda | Cambia episodio prima della fine: valori pronti fino a 2 minuti, oppure **Personalizzato…** con minuti e secondi. Le serie con i titoli segnati usano il loro valore | No |
 | Chiedi se continuare dopo | Dopo N episodi di fila chiede se continuare | Mai |
+| Timer di spegnimento | Tra 15–90 minuti, alla fine dell'episodio o della stagione | Disattivato |
+| Abbassa il volume prima | Dissolvenza negli ultimi 30 secondi prima che il timer fermi il video | Attivo |
+| Salta l'intro | Salto automatico nelle serie in cui hai segnato la fine dell'intro | Attivo |
+| Pausa quando cambi scheda | Pausa quando la scheda viene nascosta, ripresa al ritorno | Disattivato |
+| Riparti se lo streaming si blocca | Salto avanti e poi ricarica dal punto in cui eri | Attivo |
+| Notifiche sul desktop | Fine episodi, limite, timer, streaming bloccato | Attivo |
+
+Nel menu c'è anche l'elenco delle **serie salvate**, con intro e titoli segnati e il pulsante per rimuoverle.
+
+**Barra sul player.** Muovendo il mouse sul video compare in alto a destra una barra che sparisce dopo 3 secondi:
+
+| Pulsante | Quando compare | Cosa fa |
+|---|---|---|
+| Salta intro | Prima della fine dell'intro segnata | Salta alla fine dell'intro |
+| +60 s | Primi 3 minuti, se l'intro non è segnata | Avanti di un minuto |
+| Fine intro qui | Primi 10 minuti | Segna la fine dell'intro per questa serie |
+| Inizio titoli qui | Ultimi 10 minuti | Segna l'inizio dei titoli per questa serie (vale come "secondi prima della fine") |
+| Stop a fine episodio | Sempre | Attiva o disattiva il timer "fine episodio" |
+
+L'intro non viene saltata quando l'episodio riparte da un punto preciso, per esempio da "continua a guardare" del sito o dopo una ricarica.
 
 **Schermo intero tra episodi.** Il browser concede lo schermo intero vero solo dopo un click, e a ogni episodio il player viene ricreato. Per questo, al cambio episodio, l'estensione mette a schermo intero la finestra del browser (come F11) e allarga il player a tutta la finestra: il risultato è lo stesso. Per uscire premi **Esc** oppure il pulsante schermo intero del player.
 
@@ -72,6 +97,8 @@ La pagina del sito è formata da tre livelli annidati:
 ```
 
 - `src/player.js` gira nel player. Rileva la fine dell'episodio, mostra il conto alla rovescia o la domanda sul limite, clicca "prossimo episodio" e, nel nuovo episodio, lo avvia se è rimasto in pausa.
+- `src/toolbar.js` disegna la barra di pulsanti sul player.
+- `src/recovery.js` ricarica l'episodio dal punto giusto quando lo streaming si blocca.
 - `src/cinema.js` gira nelle pagine del sito e allarga il player a tutta la finestra durante lo schermo intero tra episodi.
 - `src/background.js` gestisce badge, scorciatoia, notifiche e schermo intero della finestra.
 - `src/autoplay-permission.js` e `rules.json` fanno caricare il player con il permesso `allow="autoplay"`, che il sito non concede e senza il quale il browser blocca l'audio.
@@ -93,7 +120,7 @@ L'estensione non raccoglie né invia dati: non fa richieste di rete proprie e us
 ## Struttura del repository
 
 ```
-Keep_Watching-1.2.1.zip     pacchetto pronto da installare (cartella Keep_Watching con i soli file dell'estensione)
+Keep_Watching-1.3.0.zip     pacchetto pronto da installare (cartella Keep_Watching con i soli file dell'estensione)
 manifest.json               configurazione dell'estensione (Manifest V3)
 rules.json                  regola di rete per il permesso di autoplay
 src/
@@ -101,7 +128,9 @@ src/
   cinema.js                 player a tutta finestra tra un episodio e l'altro
   defaults.js               opzioni predefinite e chiavi di archiviazione
   panel.js                  riquadro sul player (conto alla rovescia e domande)
-  player.js                 logica nel player: cambio episodio, conto alla rovescia, avvio
+  toolbar.js                barra di pulsanti sul player
+  recovery.js               ricarica dell'episodio quando lo streaming si blocca
+  player.js                 logica nel player: cambio episodio, intro, timer, streaming bloccato
   autoplay-permission.js    permesso di autoplay sull'iframe del player
   popup/                    menu dell'icona (HTML, CSS, JS)
 icons/                      icone 16, 32, 48, 128 px

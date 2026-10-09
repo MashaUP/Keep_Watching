@@ -15,6 +15,8 @@ Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando i
 9. [Scelte tecniche e alternative scartate](#9-scelte-tecniche-e-alternative-scartate)
 10. [Scheda in background](#10-scheda-in-background)
 11. [Schermo intero tra episodi, notifiche e badge](#11-schermo-intero-tra-episodi-notifiche-e-badge)
+12. [Intro, titoli per serie, timer di spegnimento](#12-intro-titoli-per-serie-timer-di-spegnimento)
+13. [Streaming bloccato](#13-streaming-bloccato)
 
 ---
 
@@ -42,6 +44,10 @@ Dati osservati:
 - **Dominio principale**: cambia periodicamente (all'epoca `streamingunity.fun`). L'estensione non ne dipende.
 - **Token del player**: il parametro `expires` scade pochi secondi dopo la generazione della pagina. Ricaricare l'URL del player dopo la scadenza produce `410 (Gone)`.
 - **Parametro `nextEpisode=1`**: presente nell'URL del player quando esiste un episodio successivo.
+- **Parametri `t` e `d`** dell'URL del player: titolo della serie ed episodio in base64 (es. `S1:E4 La verità`). Il titolo è la chiave dei dati per serie, `S<n>:` dà la stagione.
+- **Parametro `minute=N`** dell'iframe intermedio: il sito lo passa al player, che parte dal minuto N (verificato: con `minute=5` il player parte da 300 s). Il sito genera ogni volta un token nuovo per il player.
+- **Salto con `video.currentTime`**: funziona con JW Player, che aggiorna anche la sua barra (verificato).
+- **Memoria di JW Player** (`localStorage` di vixcloud.co): salva da solo sottotitoli (`jwplayer.captionLabel`), muto (`jwplayer.mute`) e qualità.
 - **Protezione anti-DevTools** nel player: vedi [sezione 5](#5-fare-debug-sul-sito).
 
 ## 2. Componenti dell'estensione
@@ -50,6 +56,8 @@ Dati osservati:
 |---|---|---|
 | `src/player.js` | Player (`vixcloud.co/embed/*`) | Rileva la fine dell'episodio, gestisce conto alla rovescia, limite e notifiche, clicca "prossimo episodio", avvia il nuovo episodio |
 | `src/panel.js` | Player (`vixcloud.co/embed/*`) | Riquadro sul player usato da `player.js` (conto alla rovescia e domande), con stile isolato in Shadow DOM |
+| `src/toolbar.js` | Player (`vixcloud.co/embed/*`) | Barra di pulsanti in alto a destra sul player, usata da `player.js` |
+| `src/recovery.js` | Pagine del sito (`*/iframe/*`) | Su richiesta ricarica l'iframe intermedio con `minute=N` |
 | `src/autoplay-permission.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | Aggiunge `allow="autoplay"` all'iframe del player e lo ricarica con il marcatore |
 | `src/cinema.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | In modalità cinema allarga a tutta la finestra l'iframe che porta al player; Esc per uscire |
 | `src/background.js` | Service worker | Badge, scorciatoia `toggle-enabled`, notifiche, schermo intero della finestra |
@@ -57,7 +65,7 @@ Dati osservati:
 | `src/defaults.js` | Service worker, player e popup | Opzioni predefinite; documenta tutte le chiavi di `chrome.storage.local` |
 | `src/popup/*` | Menu dell'icona | Legge e salva le opzioni |
 
-Nel player, `defaults.js`, `panel.js` e `player.js` vengono caricati in quest'ordine (vedi `manifest.json`) e condividono le stesse variabili globali: `player.js` usa `KW_DEFAULTS` e `kwCreatePanel` definiti negli altri due.
+Nel player, `defaults.js`, `panel.js`, `toolbar.js` e `player.js` vengono caricati in quest'ordine (vedi `manifest.json`) e condividono le stesse variabili globali: `player.js` usa `KW_DEFAULTS`, `kwActiveSleep`, `kwFormatTime`, `kwCreatePanel` e `kwCreateToolbar` definiti negli altri.
 
 ### Flusso di un cambio episodio
 
@@ -97,7 +105,9 @@ Questa è la parte più delicata dell'estensione ed è stata la più difficile d
 | Percorso `/iframe/` o `/watch/` delle pagine del sito | `manifest.json` (secondo `matches`) | **Il player non si carica** (bloccato da `rules.json`) |
 | Classe `.next-episode` nella barra `.jw-controlbar` | `player.js` (`NEXT_SELECTOR`) | Notifica "pulsante non trovato" a fine episodio |
 | Parametri `t`, `d`, `nextEpisode` nell'URL del player | `player.js` (`episodeInfo`) | Notifiche senza titolo; il controllo "pulsante non trovato" non scatta |
-| Contenitore `.jwplayer` (elemento a schermo intero) | `player.js` (`PLAYER_SELECTOR`) | Il conto alla rovescia non si vede a schermo intero |
+| Contenitore `.jwplayer` (elemento a schermo intero) | `player.js` (`PLAYER_SELECTOR`) | Il conto alla rovescia e la barra non si vedono a schermo intero |
+| Formato `S<n>:E<n>` nel parametro `d` | `player.js` (`EPISODE.season`) | Il timer "fine stagione" non scatta |
+| Parametro `minute=` dell'iframe intermedio | `recovery.js` | La ricarica per streaming bloccato riparte dall'inizio |
 | Pulsante `.jw-icon-fullscreen` | `player.js` (`FULLSCREEN_SELECTOR`) | In modalità cinema il pulsante non fa uscire (Esc funziona comunque) |
 | JW Player usa un unico `<video>` con eventi standard | `player.js` | Fine episodio non rilevata |
 | Il parametro in più `kw_autoplay=1` è accettato dal server | `autoplay-permission.js` (`MARK`) | Il player dà errore dopo il caricamento |
@@ -208,6 +218,10 @@ window.__kwTest = 1   // poi cambia episodio e riesegui:
 | Il nuovo episodio parte muto | L'autoplay con audio è stato rifiutato (`NotAllowedError` nel log) | Verifica che nel player `allow` sia presente e che il primo play della sessione sia stato fatto a mano. Aggiungi la diagnostica della sezione 5 |
 | Parte muto anche avviando a mano | JW Player ricorda lo stato "muto" | Riattiva l'audio una volta dal controllo del volume del player |
 | Il player si chiude aprendo DevTools | Protezione anti-DevTools | Ctrl+F8 in Sources, poi ricarica |
+| La barra di pulsanti non compare | Mouse non mosso sul video, `.jwplayer` cambiato, o il sito blocca gli eventi del mouse | Muovi il mouse sul video; controlla `PLAYER_SELECTOR` |
+| L'intro non viene saltata | Opzione "Salta l'intro" spenta, intro non segnata per quella serie, episodio partito da `minute=` | Controlla l'elenco delle serie nel menu |
+| Volume rimasto basso dopo il timer | Pagina chiusa durante la dissolvenza: JW Player ha ricordato il volume | Rialza il volume una volta dal player |
+| Notifica "streaming bloccato" | Due blocchi entro 3 minuti | Ricarica la pagina; se succede spesso, il problema è del server |
 | Il conto alla rovescia non compare | Opzione su "No, cambia subito", oppure `.jwplayer` cambiato | Controlla il menu; poi cerca nel player il contenitore che va a schermo intero |
 | Notifica "pulsante non trovato" | Il sito ha cambiato la barra dei controlli | Usa il comando "Pulsanti della barra" e aggiorna `NEXT_SELECTOR` |
 | Nessuna notifica | Notifiche disattivate nel menu, nel browser o nel sistema operativo | Controlla le impostazioni di notifica di Windows per Brave |
@@ -247,6 +261,13 @@ Con DevTools aperto, Ctrl+F8 attivo e filtro `Keep_Watching` in Console:
 - [ ] "Chiedi se continuare dopo 1 episodio": al secondo finale compare la domanda; "Continua" va avanti, "Basta così" si ferma.
 - [ ] Il badge mostra "1/1" durante il limite e "OFF" con Alt+Shift+K; la scorciatoia riattiva l'estensione.
 - [ ] Sull'ultimo episodio arriva la notifica; cliccandola si torna alla scheda.
+- [ ] "Fine intro qui" segna l'intro; nell'episodio successivo l'intro viene saltata e "Annulla" torna indietro.
+- [ ] "Inizio titoli qui" vicino alla fine: il cambio episodio parte subito e negli episodi dopo al momento segnato.
+- [ ] La barra compare muovendo il mouse sul video, anche a schermo intero, e sparisce dopo 3 secondi.
+- [ ] Timer "Tra 15 minuti": il volume si abbassa negli ultimi 30 secondi, il video si ferma e il volume torna normale.
+- [ ] "Stop a fine episodio" dalla barra: alla fine compare "Prossimo episodio" invece del cambio automatico.
+- [ ] Timer "Alla fine della stagione": al primo episodio della stagione dopo il video si ferma.
+- [ ] "Pausa quando cambi scheda": cambiando scheda il video va in pausa e riparte al ritorno.
 - [ ] "Personalizzato…" con un valore come 3 min 30 s cambia episodio al momento giusto, e riaprendo il menu il valore è ancora lì.
 - [ ] Con la finestra ridotta a icona durante il finale, il cambio episodio avviene e il nuovo episodio parte (o al più parte appena si torna sulla scheda).
 
@@ -311,3 +332,45 @@ Il badge viene aggiornato dal service worker a ogni cambio di `enabled`, `stopAf
 ### Test senza il sito reale
 
 Durante lo sviluppo della 1.2.0 le funzioni sono state provate su un sito finto con la stessa struttura a tre livelli (pagina, iframe intermedio, player su `vixcloud.co` reindirizzato in locale): conto alla rovescia, annulla, limite con domanda, badge, notifica di fine episodi, modalità cinema con entrata da schermo intero e uscita con Esc o con il pulsante del player.
+
+## 12. Intro, titoli per serie, timer di spegnimento
+
+### Dati per serie
+
+La chiave è il titolo della serie, letto dal parametro `t` dell'URL del player (`series` in `chrome.storage.local`, vedi `defaults.js`). `introEnd` è il secondo di fine intro; `creditsStart` sono i secondi prima della fine in cui iniziano i titoli, così vale anche per episodi di durata diversa. Due serie con lo stesso titolo condividerebbero i dati.
+
+- **Salto intro** (`maybeSkipIntro`): valutato una sola volta per episodio, al primo `timeupdate` con il video in riproduzione. Non scatta se l'URL ha `minute>0` o se si sta riprendendo dopo una ricarica.
+- **Titoli** (`creditsOffset`): il valore della serie ha la precedenza su quello generale; viene ignorato se lascerebbe meno di 60 secondi di episodio.
+
+### Barra di pulsanti
+
+`toolbar.js` crea un elemento in alto a destra dentro `.jwplayer`, con stile in Shadow DOM chiuso. Compare a ogni movimento del mouse sul documento del player e si nasconde dopo 3 secondi, con una logica propria: non dipende dalle classi interne con cui JW nasconde i suoi controlli. I pulsanti vengono ricalcolati a ogni `timeupdate` e la barra si ridisegna solo se cambiano.
+
+### Timer di spegnimento
+
+Lo stato è in `sleep` (`chrome.storage.local`), così sopravvive al cambio episodio. Il controllo avviene a ogni `timeupdate` del video, che non viene rallentato nelle schede nascoste come i timer.
+
+- **A tempo**: alla scadenza il video va in pausa. Un timer scaduto da più di un minuto (per esempio mentre il video era in pausa) viene ignorato.
+- **Fine episodio**: alla fine dell'episodio, o all'inizio dei titoli se impostati, il video si ferma invece di cambiare episodio.
+- **Fine stagione**: il primo player che lo legge memorizza la stagione corrente; al caricamento di un episodio di un'altra stagione il video viene fermato (anche se JW lo avvia da solo, evento `playing`).
+- **Dissolvenza**: negli ultimi 30 secondi `video.volume` scende in proporzione; a video fermo torna al valore iniziale, perché JW Player ricorda il volume per gli episodi successivi.
+
+Tutti i timer si azzerano (`mode: 'off'`) dopo essere scattati. "Fine episodio" e "fine stagione" scadono dopo 12 ore.
+
+### Pausa quando cambi scheda
+
+Evento `visibilitychange` nel player: con la scheda nascosta il video va in pausa, al ritorno riparte solo se l'aveva fermato l'estensione. Se un nuovo episodio si carica mentre la scheda è nascosta, parte al ritorno. Questa funzione non è stata provata in automatico: l'ambiente di test non riesce a nascondere le schede.
+
+## 13. Streaming bloccato
+
+Controllo ogni 2 secondi in `player.js`, solo dopo che il video ha suonato almeno una volta e mentre non è in pausa:
+
+1. Il video è considerato in movimento se `currentTime` avanza in avanti di non più del tempo trascorso (più un margine). Salti indietro o in avanti non contano come avanzamento, e il confronto con il tempo reale regge i timer rallentati della scheda nascosta.
+2. Dopo 12 secondi fermo: salto di 1 secondo in avanti, che spesso basta a far ripartire hls.js.
+3. Dopo altri 12 secondi (o con un evento `error` del video): `player.js` salva `resume` (titolo, episodio, ultima posizione in cui il video suonava) e chiede al service worker `reloadEpisode`. Il service worker inoltra il messaggio a tutti i frame della scheda; risponde solo `recovery.js` nell'iframe intermedio, che si ricarica con `minute=<minuti>`.
+4. Il nuovo player trova `resume` (valido 90 secondi, stesso titolo ed episodio) e porta il video al secondo esatto; `pendingPlayAt` lo fa partire.
+5. Se serve una seconda ricarica entro 3 minuti (`lastReloadAt`), non viene fatta: arriva una notifica.
+
+Perché non si ricarica l'iframe del player: il suo token scade pochi secondi dopo la generazione della pagina (`410 Gone`). L'iframe intermedio invece genera ogni volta un token nuovo.
+
+Test fatti sul sito di prova: flusso video che si interrompe a metà, salto di 1 secondo, ricarica con `minute=0` e ripresa al secondo 13.
