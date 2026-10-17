@@ -7,12 +7,17 @@
  *   - mostrare il conto alla rovescia, o la domanda al raggiungimento del limite
  *     di episodi, e poi cliccare "prossimo episodio";
  *   - saltare l'intro nelle serie in cui è stata segnata e mostrare la barra di
- *     pulsanti sul player (toolbar.js);
+ *     pulsanti sul player (toolbar.js), con il salto avanti di durata configurabile;
  *   - timer di spegnimento (a tempo, fine episodio, fine stagione) con dissolvenza;
  *   - pausa quando la scheda viene nascosta (opzionale);
  *   - far ripartire lo streaming bloccato (salto di 1 s, poi ricarica dell'episodio);
  *   - passare alla modalità cinema se si stava guardando a schermo intero;
+ *   - eseguire le scorciatoie da tastiera (inoltrate dal service worker) e mostrarne la guida;
+ *   - misurare il tempo di visione reale per le statistiche locali;
  *   - nel nuovo episodio, avviare la riproduzione se è rimasta in pausa.
+ *
+ * Popup sul player: ogni messaggio appartiene a una categoria (KW_POPUP_CATEGORIES).
+ * Nascondere una categoria nasconde solo il messaggio, mai la funzione: vedi showPanel().
  *
  * Ogni episodio è un documento nuovo: le informazioni da un episodio al successivo
  * passano da chrome.storage.local (chiavi pendingPlayAt, sleep, resume, series).
@@ -46,9 +51,7 @@
   const FULLSCREEN_EXIT_TIMEOUT_MS = 1500;
   // Dissolvenza del volume prima che il timer di spegnimento fermi il video.
   const FADE_S = 30;
-  // Pulsanti della barra: "+60 s" nei primi minuti, "Fine intro qui" e "Inizio titoli qui"
-  // solo nella parte iniziale e finale dell'episodio.
-  const PLUS60_WINDOW_S = 3 * 60;
+  // "Fine intro qui" e "Inizio titoli qui" solo nella parte iniziale e finale dell'episodio.
   const INTRO_WINDOW_S = 10 * 60;
   const CREDITS_WINDOW_S = 10 * 60;
   // Watchdog: dopo quanto un video che dovrebbe suonare ma non avanza è considerato bloccato.
@@ -58,14 +61,17 @@
   const RELOAD_COOLDOWN_MS = 3 * 60 * 1000;
   // Validità della posizione da ripristinare dopo una ricarica.
   const RESUME_MAX_AGE_MS = 90 * 1000;
+  // Statistiche: ogni quanto il tempo di visione misurato viene mandato al service worker.
+  const STATS_FLUSH_MS = 15 * 1000;
 
-  const settings = { ...KW_DEFAULTS };
+  let settings = kwSanitize({});
   let loaded = false;       // impostazioni lette dallo storage
   let series = {};          // dati per serie (vedi defaults.js)
   let sleep = null;         // timer di spegnimento (vedi defaults.js)
   let cinema = false;
   let fired = false;        // fine episodio già gestita (cambio, stop o annullamento)
   let endHandled = false;   // assenza di un episodio successivo già gestita
+  let silentNext = null;    // cambio episodio in attesa con il conto alla rovescia nascosto
   let started = false;      // il video ha iniziato a suonare almeno una volta
   let introDone = false;    // il salto intro è già stato valutato per questo episodio
   let resumeTarget = null;  // secondo da ripristinare dopo una ricarica
@@ -81,9 +87,14 @@
     .catch((e) => log('Messaggio non consegnato:', msg.type, e.message));
   const exitCinema = () => send({ type: 'exitCinema' });
   const getContainer = () => document.querySelector(PLAYER_SELECTOR) || document.body;
+  const getSettings = () => settings;
 
-  const panel = kwCreatePanel(getContainer);
-  const toolbar = kwCreateToolbar(getContainer);
+  const panel = kwCreatePanel(getContainer, getSettings);
+  const toast = kwCreateToast(getContainer, getSettings);
+  const toolbar = kwCreateToolbar(getContainer, getSettings);
+  const guide = kwCreateGuide(getContainer, getSettings, {
+    onConfigure: () => send({ type: 'kwOpenShortcuts' })
+  });
 
   // Dati dell'episodio dall'URL del player, che non cambia per tutta la vita del documento:
   // t = titolo e d = episodio (in base64, es. "S1:E1 On the road"), nextEpisode=1 se c'è
@@ -105,7 +116,9 @@
       name,
       season: season ? Number(season[1]) : null,
       hasNext: params.get('nextEpisode') === '1',
-      startMinute: Number(params.get('minute')) || 0
+      startMinute: Number(params.get('minute')) || 0,
+      // Per riconoscere lo stesso episodio nelle statistiche senza salvarne il titolo.
+      key: KWStats.episodeKey(`${decode(params.get('t')) || ''}|${name || location.pathname}`)
     };
   })();
 
@@ -134,24 +147,53 @@
 
   const setSleep = (value) => chrome.storage.local.set({ sleep: value });
 
+  // ---------- Popup per categoria ----------
+
+  const popupOn = (category) => kwPopupVisible(settings, category);
+
+  /** Riquadro di una categoria: se la categoria è nascosta non compare (la funzione sì). */
+  function showPanel(category, opts) {
+    if (!popupOn(category)) return false;
+    panel.open(opts);
+    return true;
+  }
+
+  /** Avviso breve di una categoria. */
+  function showToast(category, text, opts) {
+    if (popupOn(category)) toast.show(text, opts);
+  }
+
   // ---------- Impostazioni ----------
+
+  function applySettings(raw) {
+    settings = kwSanitize(raw);
+    toolbar.applySettings();
+    refreshToolbar();
+  }
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    for (const key of Object.keys(KW_DEFAULTS)) {
-      if (changes[key]) settings[key] = changes[key].newValue;
+    if (Object.keys(KW_DEFAULTS).some((k) => changes[k])) {
+      const next = { ...settings };
+      for (const key of Object.keys(KW_DEFAULTS)) if (changes[key]) next[key] = changes[key].newValue;
+      applySettings(next);
     }
     if (changes.cinema) cinema = changes.cinema.newValue;
     if (changes.series) series = changes.series.newValue || {};
     if (changes.sleep) {
       sleep = changes.sleep.newValue;
       checkSeasonSleep();
+      refreshToolbar();
     }
     // Estensione sospesa durante un conto alla rovescia: si chiude senza cambiare episodio.
-    if (!settings.enabled || !settings.autoNext) panel.close();
+    if (!settings.enabled || !settings.autoNext) {
+      panel.close();
+      cancelSilentNext();
+    }
     if (!settings.enabled) {
       const v = findVideo();
       if (v) restoreFade(v);
+      flushStats();
     }
   });
 
@@ -171,10 +213,28 @@
 
   function askToContinue() {
     const n = settings.stopAfter;
+    if (document.hidden && settings.notifyEnd) {
+      send({
+        type: 'notify',
+        title: 'Keep_Watching: limite raggiunto',
+        message: `Hai visto ${episodes(n)} di fila${EPISODE.title ? ` di ${EPISODE.title}` : ''}. Torna sulla scheda per continuare.`
+      });
+    }
+
+    // Domanda nascosta: la scelta sicura è fermarsi. Si continua premendo "prossimo
+    // episodio" sul player, che azzera anche il conteggio (vedi il listener dei click).
+    if (!popupOn('limit')) {
+      log(`Limite di ${episodes(n)} di fila raggiunto: mi fermo (domanda nascosta).`, tabState());
+      if (cinema) exitCinema();
+      return;
+    }
+
     log(`Limite di ${episodes(n)} di fila raggiunto, chiedo se continuare.`, tabState());
     panel.open({
-      title: `Hai visto ${episodes(n)} di fila`,
-      text: 'Vuoi passare al prossimo?',
+      kind: 'limit',
+      title: 'Vuoi continuare a guardare?',
+      text: `Hai visto ${episodes(n)} di fila.`,
+      icon: '?',
       buttons: [
         {
           label: 'Basta così',
@@ -194,14 +254,6 @@
         }
       ]
     });
-
-    if (document.hidden && settings.notifyEnd) {
-      send({
-        type: 'notify',
-        title: 'Keep_Watching: limite raggiunto',
-        message: `Hai visto ${episodes(n)} di fila${EPISODE.title ? ` di ${EPISODE.title}` : ''}. Torna sulla scheda per continuare.`
-      });
-    }
   }
 
   // ---------- Nessun episodio successivo ----------
@@ -255,10 +307,14 @@
   }
 
   async function doNext(reason) {
+    cancelSilentNext();
     if (!findNextButton()) return handleNoNext();
 
     await bumpStreak();
     log(`${reason}, passo al successivo.`, tabState());
+    // Titoli saltati dall'estensione (anche con "Vai ora" del conto alla rovescia).
+    if (reason === 'Titoli di coda') statsEvent('credits');
+    flushStats();
     // Il segnale va salvato prima del click: il nuovo episodio lo leggerà all'avvio.
     await chrome.storage.local.set({ pendingPlayAt: Date.now() });
 
@@ -275,19 +331,39 @@
     if (btn) btn.click();
   }
 
+  function cancelSilentNext() {
+    if (!silentNext) return;
+    clearTimeout(silentNext);
+    silentNext = null;
+  }
+
+  // Un cambio episodio è già in corso (conto alla rovescia o domanda sul limite)?
+  // Gli altri riquadri, come "Intro saltata", non bloccano il cambio: vengono sostituiti.
+  const nextInProgress = () => Boolean(silentNext) || ['next', 'limit'].includes(panel.kind());
+
   async function goNext(reason) {
-    if (panel.isOpen() || !settings.enabled || !settings.autoNext) return;
+    if (nextInProgress() || !settings.enabled || !settings.autoNext) return;
     if (!findNextButton()) return handleNoNext();
     fired = true;
 
     if (settings.stopAfter > 0 && (await currentStreak()) >= settings.stopAfter) return askToContinue();
     if (!settings.countdown) return doNext(reason);
 
+    // Conto alla rovescia nascosto: il cambio avviene comunque, dopo lo stesso tempo.
+    if (!popupOn('countdown')) {
+      log(`${reason}: cambio tra ${settings.countdown} s (conto alla rovescia nascosto).`, tabState());
+      silentNext = setTimeout(() => { silentNext = null; doNext(reason); }, settings.countdown * 1000);
+      return;
+    }
+
     log(`${reason}: conto alla rovescia di ${settings.countdown} s.`, tabState());
     panel.open({
+      kind: 'next',
       title: EPISODE.title ? `Prossimo episodio di ${EPISODE.title}` : 'Prossimo episodio',
+      icon: '▶',
       countdown: {
         seconds: settings.countdown,
+        big: true,
         text: (s) => `Parte tra ${s} ${s === 1 ? 'secondo' : 'secondi'}`,
         onDone: () => doNext(reason)
       },
@@ -300,6 +376,7 @@
 
   // Fine dell'episodio (o inizio dei titoli): timer "fine episodio" oppure cambio episodio.
   function handleEnd(video, reason) {
+    statsMaybeCompleted(video);
     if (fired || !loaded) return;
     const active = kwActiveSleep(sleep);
     if (settings.enabled && active && active.mode === 'episode') {
@@ -334,7 +411,7 @@
     const buttons = offerNext && findNextButton()
       ? [{ label: 'Chiudi', onClick: () => {} }, { label: 'Prossimo episodio', primary: true, onClick: () => doNext('Prossimo dopo il timer') }]
       : [{ label: 'Riprendi', primary: true, onClick: () => video.play().catch(() => {}) }];
-    panel.open({ title: 'Timer di spegnimento', text, buttons });
+    showPanel('sleep', { title: 'Timer di spegnimento', text, icon: '⏾', buttons });
   }
 
   // Controllo a ogni timeupdate: dissolvenza e scadenza del timer.
@@ -374,9 +451,10 @@
     const v = findVideo();
     if (v && !v.paused) v.pause();
     if (cinema) exitCinema();
-    panel.open({
+    showPanel('sleep', {
       title: 'Timer di spegnimento',
       text: `Stagione ${active.season} finita, come richiesto.`,
+      icon: '⏾',
       buttons: [{
         label: 'Guarda comunque',
         primary: true,
@@ -396,7 +474,7 @@
     }
   }
 
-  // ---------- Salto intro e ripristino della posizione ----------
+  // ---------- Salti: intro, salto avanti, ripristino della posizione ----------
 
   function applyResume(video) {
     if (resumeTarget === null || !isFinite(video.duration)) return;
@@ -404,6 +482,7 @@
     resumeTarget = null;
     if (Math.abs(video.currentTime - target) > 3) video.currentTime = target;
     log(`Episodio ripreso da ${kwFormatTime(target)}.`);
+    showToast('recovery', `Episodio ripreso da ${kwFormatTime(target)}`, { tone: 'ok' });
   }
 
   function maybeSkipIntro(video) {
@@ -417,71 +496,115 @@
     const from = video.currentTime;
     video.currentTime = end;
     log(`Intro saltata: da ${kwFormatTime(from)} a ${kwFormatTime(end)}.`);
-    panel.open({
+    statsEvent('intro');
+    showPanel('confirm', {
       title: 'Intro saltata',
+      icon: '✓',
+      tone: 'ok',
       countdown: { seconds: 6, text: () => `Ripresa da ${kwFormatTime(end)}`, onDone: () => {} },
-      buttons: [{ label: 'Annulla', onClick: () => { video.currentTime = from; } }]
+      buttons: [{ label: 'Annulla', onClick: () => { video.currentTime = from; statsEvent('introUndo'); } }]
     });
+  }
+
+  /**
+   * Salto avanti della durata scelta (quickSkip). Si può ripetere quante volte si vuole:
+   * ogni salto parte dalla posizione appena impostata. Non supera la fine del video se la
+   * durata è nota; con durata sconosciuta salta comunque.
+   */
+  function quickSkip() {
+    const v = findVideo();
+    if (!v) return false;
+    const from = v.currentTime;
+    let target = from + settings.quickSkip;
+    if (isFinite(v.duration) && v.duration > 0) target = Math.min(target, Math.max(0, v.duration - 1));
+    if (!(target > from)) return false;
+    v.currentTime = target;
+    return true;
+  }
+
+  function skipIntroNow() {
+    const v = findVideo();
+    const end = seriesConf().introEnd;
+    if (!v || !end || v.currentTime >= end - 1) return false;
+    v.currentTime = end;
+    return true;
+  }
+
+  /** "Fine intro qui": restituisce il testo di conferma, o null se troppo presto. */
+  function markIntro() {
+    const v = findVideo();
+    const at = v && Math.round(v.currentTime);
+    if (!EPISODE.title || !at || at < 5) return null;
+    updateSeries({ introEnd: at });
+    log(`Fine intro di ${EPISODE.title} segnata a ${kwFormatTime(at)}.`);
+    return `Intro fino a ${kwFormatTime(at)} ✓`;
+  }
+
+  /** "Inizio titoli qui": salva quanti secondi prima della fine iniziano i titoli. */
+  function markCredits() {
+    const v = findVideo();
+    if (!EPISODE.title || !v || !isFinite(v.duration)) return null;
+    const before = Math.round(v.duration - v.currentTime);
+    if (v.duration - before < MIN_WATCHED_S || before < 1) return null;
+    updateSeries({ creditsStart: before });
+    log(`Titoli di ${EPISODE.title} segnati: ultimi ${kwFormatTime(before)}.`);
+    return `Titoli: ultimi ${kwFormatTime(before)} ✓`;
+  }
+
+  function toggleStopAtEnd() {
+    const active = kwActiveSleep(sleep);
+    const on = !!active && active.mode === 'episode';
+    setSleep(on ? { mode: 'off' } : { mode: 'episode', setAt: Date.now() });
+    return !on;
   }
 
   // ---------- Barra di pulsanti sul player ----------
 
   function flashLabel(id, label) {
+    if (!popupOn('confirm')) return;
     flash = { id, label, until: Date.now() + 2000 };
     refreshToolbar();
     setTimeout(refreshToolbar, 2100);
   }
 
   function toolbarButtons(video) {
-    if (!loaded || !settings.enabled || !video || !isFinite(video.duration)) return [];
+    if (!loaded || !settings.enabled || !video) return [];
     const t = video.currentTime;
-    const left = video.duration - t;
+    const known = isFinite(video.duration) && video.duration > 0;
+    const left = known ? video.duration - t : Infinity;
     const conf = seriesConf();
     const buttons = [];
 
-    if (EPISODE.title) {
-      if (conf.introEnd && t < conf.introEnd - 1) {
-        buttons.push({ id: 'skipIntro', label: 'Salta intro', primary: true, onClick: () => {
-          const v = findVideo();
-          if (v) v.currentTime = conf.introEnd;
-        } });
-      } else if (t < PLUS60_WINDOW_S) {
-        buttons.push({ id: 'plus60', label: '+60 s', onClick: () => {
-          const v = findVideo();
-          if (v) v.currentTime = Math.min(v.currentTime + 60, v.duration - 1);
-        } });
-      }
-      if (t < INTRO_WINDOW_S) {
-        buttons.push({ id: 'setIntro', label: 'Fine intro qui', onClick: () => {
-          const v = findVideo();
-          const at = v && Math.round(v.currentTime);
-          if (!at || at < 5) return flashLabel('setIntro', 'Troppo presto');
-          updateSeries({ introEnd: at });
-          log(`Fine intro di ${EPISODE.title} segnata a ${kwFormatTime(at)}.`);
-          flashLabel('setIntro', `Intro fino a ${kwFormatTime(at)} ✓`);
-        } });
-      }
-      if (left < CREDITS_WINDOW_S && left > 5) {
-        buttons.push({ id: 'setCredits', label: 'Inizio titoli qui', onClick: () => {
-          const v = findVideo();
-          if (!v) return;
-          const before = Math.round(v.duration - v.currentTime);
-          if (v.duration - before < MIN_WATCHED_S) return flashLabel('setCredits', 'Troppo presto');
-          updateSeries({ creditsStart: before });
-          log(`Titoli di ${EPISODE.title} segnati: ultimi ${kwFormatTime(before)}.`);
-          flashLabel('setCredits', `Titoli: ultimi ${kwFormatTime(before)} ✓`);
-        } });
-      }
+    if (EPISODE.title && conf.introEnd && t < conf.introEnd - 1) {
+      buttons.push({ id: 'skipIntro', label: 'Salta intro', primary: true, onClick: skipIntroNow });
     }
-
-    const active = kwActiveSleep(sleep);
-    const stopAtEnd = !!active && active.mode === 'episode';
-    buttons.push({
-      id: 'sleepEpisode',
-      label: stopAtEnd ? 'Stop a fine episodio ✓' : 'Stop a fine episodio',
-      active: stopAtEnd,
-      onClick: () => setSleep(stopAtEnd ? { mode: 'off' } : { mode: 'episode', setAt: Date.now() })
-    });
+    // Il salto avanti è sempre disponibile (anche ripetuto), tranne a fine video.
+    if (!known || left > 1.5) {
+      buttons.push({ id: 'quick', label: `+${settings.quickSkip} s`, title: `Avanti di ${settings.quickSkip} secondi`, onClick: quickSkip });
+    }
+    if (!settings.uiMinimal) {
+      if (EPISODE.title && t < INTRO_WINDOW_S) {
+        buttons.push({ id: 'setIntro', label: 'Fine intro qui', onClick: () => {
+          const ok = markIntro();
+          flashLabel('setIntro', ok || 'Troppo presto');
+        } });
+      }
+      if (EPISODE.title && known && left < CREDITS_WINDOW_S && left > 5) {
+        buttons.push({ id: 'setCredits', label: 'Inizio titoli qui', onClick: () => {
+          const ok = markCredits();
+          flashLabel('setCredits', ok || 'Troppo presto');
+        } });
+      }
+      const active = kwActiveSleep(sleep);
+      const stopAtEnd = !!active && active.mode === 'episode';
+      buttons.push({
+        id: 'sleepEpisode',
+        label: stopAtEnd ? 'Stop a fine episodio ✓' : 'Stop a fine episodio',
+        active: stopAtEnd,
+        onClick: toggleStopAtEnd
+      });
+      buttons.push({ id: 'help', label: '?', title: 'Scorciatoie da tastiera', extraClass: 'help', onClick: openGuide });
+    }
 
     if (flash && flash.until > Date.now()) {
       const b = buttons.find((x) => x.id === flash.id);
@@ -501,6 +624,138 @@
     }, { capture: true, passive: true });
   }
 
+  // ---------- Scorciatoie e guida ----------
+
+  const isEditable = (el) => Boolean(el && (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' ||
+    (el.tagName === 'INPUT' && !['button', 'checkbox', 'radio', 'range', 'submit', 'reset', 'color', 'file', 'image'].includes(el.type))));
+
+  /** Per la guida: perché un comando non è utilizzabile adesso (true se lo è). */
+  function availability() {
+    const v = findVideo();
+    const t = v ? v.currentTime : 0;
+    const known = v && isFinite(v.duration) && v.duration > 0;
+    const off = 'Keep_Watching è sospeso';
+    const conf = seriesConf();
+    return {
+      'toggle-enabled': true,
+      'show-shortcuts': true,
+      'quick-skip': !settings.enabled ? off : (v ? true : 'il video non è ancora pronto'),
+      'skip-intro': !settings.enabled ? off : !EPISODE.title ? 'il titolo della serie non è disponibile'
+        : !conf.introEnd ? 'intro non segnata per questa serie' : t >= conf.introEnd - 1 ? 'l\'intro è già passata' : true,
+      'mark-intro': !settings.enabled ? off : t < INTRO_WINDOW_S ? true : 'solo nei primi 10 minuti',
+      'mark-credits': !settings.enabled ? off : known && v.duration - t < CREDITS_WINDOW_S ? true : 'solo negli ultimi 10 minuti',
+      'stop-at-end': !settings.enabled ? off : true
+    };
+  }
+
+  async function openGuide() {
+    const res = await send({ type: 'kwShortcutStates' });
+    guide.open((res && res.states) || [], availability());
+  }
+
+  function runCommand(command, states) {
+    if (command === 'show-shortcuts') {
+      if (guide.isOpen()) guide.close();
+      else guide.open(states || [], availability());
+      return;
+    }
+    if (!settings.enabled) return;
+    if (command === 'quick-skip') {
+      if (quickSkip()) showToast('info', `Avanti di ${settings.quickSkip} s`);
+    } else if (command === 'skip-intro') {
+      if (skipIntroNow()) showToast('info', 'Intro saltata');
+      else showToast('info', availability()['skip-intro'] === true ? 'Intro non saltata' : `Salta intro: ${availability()['skip-intro']}`);
+    } else if (command === 'mark-intro') {
+      const ok = markIntro();
+      showToast('confirm', ok || 'Fine intro: troppo presto', { tone: ok ? 'ok' : 'warn' });
+    } else if (command === 'mark-credits') {
+      const ok = markCredits();
+      showToast('confirm', ok || 'Inizio titoli: troppo presto', { tone: ok ? 'ok' : 'warn' });
+    } else if (command === 'stop-at-end') {
+      const on = toggleStopAtEnd();
+      showToast('sleep', on ? 'Stop a fine episodio attivato' : 'Stop a fine episodio disattivato', { tone: on ? 'ok' : '' });
+    }
+    refreshToolbar();
+  }
+
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (!msg || !msg.type) return;
+    if (msg.type === 'kwIsEditing') {
+      // Risponde solo il frame dove si sta scrivendo: gli altri tacciono.
+      if (document.hasFocus() && isEditable(document.activeElement)) sendResponse({ editing: true });
+      return;
+    }
+    // La risposta conferma al service worker che un player ha ricevuto il comando.
+    if (msg.type === 'kwCommand') { runCommand(msg.command, msg.states); sendResponse({ ok: true }); }
+    if (msg.type === 'kwCloseGuide') { guide.close(); sendResponse({ ok: true }); }
+  });
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (guide.isOpen()) guide.close();
+    if (cinema) exitCinema();
+  }, true);
+
+  // ---------- Statistiche di visione (solo locali) ----------
+  // Si conta solo il tempo in cui il video avanza davvero: niente pausa, caricamento o
+  // salti. L'intervallo si misura con l'orologio monotono (performance.now) e si confronta
+  // con l'avanzamento del video, così una scheda sospesa non aggiunge tempo inventato.
+
+  const track = { last: null, pending: 0, est: false, contentPlayed: 0, startPos: null, completed: false };
+  const statsOn = () => loaded && settings.enabled && settings.statsEnabled;
+
+  function statsSample(v) {
+    const now = performance.now();
+    const playing = !v.paused && !v.ended && !v.seeking && v.readyState >= 3;
+    if (track.last && track.last.playing && playing) {
+      const dt = (now - track.last.perf) / 1000;
+      const dct = v.currentTime - track.last.ct;
+      const rate = v.playbackRate > 0 ? v.playbackRate : 1;
+      if (dt > 0 && dct > 0 && dct <= dt * rate + 1.5) {
+        track.pending += Math.min(dt, dct / rate + 0.25);
+        track.contentPlayed += dct;
+        if (dt > 20) track.est = true;
+      }
+    }
+    if (playing && track.startPos === null) track.startPos = v.currentTime;
+    track.last = { perf: now, ct: v.currentTime, playing };
+  }
+
+  function flushStats(playingNow) {
+    const v = findVideo();
+    if (v) statsSample(v);
+    const playing = playingNow !== undefined ? playingNow : Boolean(v && !v.paused && !v.ended);
+    const msg = { type: 'kwStats', status: { title: EPISODE.title, name: EPISODE.name, playing } };
+    if (statsOn() && track.pending >= 0.5) {
+      msg.play = { seconds: track.pending, estimated: track.est, at: Date.now() };
+      track.pending = 0;
+      track.est = false;
+    }
+    send(msg);
+  }
+
+  function statsEvent(type) {
+    if (statsOn()) send({ type: 'kwStats', event: { type, key: type === 'completed' ? EPISODE.key : undefined, at: Date.now() } });
+  }
+
+  /**
+   * Episodio completato: fine (o titoli) raggiunta dopo aver guardato davvero almeno metà
+   * di quello che restava dal punto di partenza, minimo 60 secondi. Una volta per player;
+   * il service worker scarta anche i doppioni dello stesso episodio entro 6 ore.
+   */
+  function statsMaybeCompleted(v) {
+    if (track.completed || !isFinite(v.duration) || track.startPos === null) return;
+    statsSample(v);
+    const need = Math.max(MIN_WATCHED_S, 0.5 * (v.duration - track.startPos));
+    if (track.contentPlayed < need) return;
+    track.completed = true;
+    statsEvent('completed');
+  }
+
+  setInterval(() => { if (findVideo()) flushStats(); }, STATS_FLUSH_MS);
+  window.addEventListener('pagehide', () => flushStats(false));
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flushStats(); });
+
   // ---------- Eventi del video ----------
   // Gli eventi media non fanno bubbling ma attraversano la fase di capture:
   // un listener sul document intercetta gli eventi di qualsiasi <video>,
@@ -509,10 +764,14 @@
     if (e.target instanceof HTMLVideoElement) handler(e.target);
   }, true);
 
-  onVideo('ended', (v) => handleEnd(v, 'Episodio finito'));
+  for (const type of ['playing', 'waiting', 'seeking', 'seeked', 'stalled', 'ratechange']) onVideo(type, statsSample);
+  onVideo('pause', (v) => { statsSample(v); flushStats(false); });
+
+  onVideo('ended', (v) => { statsSample(v); handleEnd(v, 'Episodio finito'); flushStats(false); });
 
   onVideo('timeupdate', (v) => {
     if (!loaded) return;
+    statsSample(v);
     applyResume(v);
     maybeSkipIntro(v);
     checkSleep(v);
@@ -530,12 +789,19 @@
   });
 
   // Se l'utente torna indietro e riguarda il finale, consenti un nuovo cambio.
-  onVideo('play', () => { if (!panel.isOpen()) fired = false; });
+  onVideo('play', () => {
+    cancelSilentNext();
+    if (!['next', 'limit'].includes(panel.kind())) fired = false;
+  });
 
-  // Anche un click manuale su "prossimo episodio" fa partire da solo il nuovo episodio.
+  // Click manuale su "prossimo episodio": il nuovo episodio parte da solo, e il conteggio
+  // degli episodi di fila riparte (hai scelto tu di continuare).
   document.addEventListener('click', (e) => {
     if (e.isTrusted && e.target instanceof Element && e.target.closest(NEXT_SELECTOR)) {
+      cancelSilentNext();
+      flushStats();
       chrome.storage.local.set({ pendingPlayAt: Date.now() });
+      resetStreak();
     }
   }, true);
 
@@ -549,10 +815,6 @@
       if (type === 'click') exitCinema();
     }, true);
   }
-
-  window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && cinema) exitCinema();
-  }, true);
 
   // ---------- Pausa quando la scheda viene nascosta ----------
 
@@ -584,6 +846,7 @@
     const { lastReloadAt = 0 } = await chrome.storage.local.get('lastReloadAt');
     if (Date.now() - lastReloadAt < RELOAD_COOLDOWN_MS) {
       log(`${reason}: ricaricato da poco, non riprovo.`);
+      showToast('recovery', 'Lo streaming non riparte: prova a ricaricare la pagina', { tone: 'warn', ms: 8000 });
       send({
         type: 'notify',
         title: 'Keep_Watching: streaming bloccato',
@@ -593,6 +856,8 @@
     }
     const seconds = Math.floor(goodPos);
     log(`${reason}: ricarico l'episodio da ${kwFormatTime(seconds)}.`);
+    showToast('recovery', `Ricarico l'episodio da ${kwFormatTime(seconds)}…`, { tone: 'warn', ms: 6000 });
+    flushStats(false);
     await chrome.storage.local.set({
       lastReloadAt: Date.now(),
       pendingPlayAt: Date.now(),
@@ -602,6 +867,12 @@
   }
 
   onVideo('playing', (v) => { goodPos = v.currentTime; });
+  // Un salto (dell'utente, della barra o dell'intro) non è un blocco: il conteggio riparte
+  // dalla nuova posizione. Senza questo, molti salti di fila sembravano uno streaming fermo.
+  onVideo('seeked', (v) => {
+    lastPos = v.currentTime;
+    lastMove = Date.now();
+  });
 
   setInterval(() => {
     const v = findVideo();
@@ -622,7 +893,10 @@
     // Avanzamento normale: in avanti e non più di quanto è passato (con un margine).
     // Il confronto con il tempo trascorso regge anche i timer rallentati della scheda nascosta.
     if (delta > 0 && delta <= elapsedS * Math.max(1, v.playbackRate) + 2) {
-      if (stallStage) log('Lo streaming è ripartito.');
+      if (stallStage) {
+        log('Lo streaming è ripartito.');
+        showToast('recovery', 'Lo streaming è ripartito', { tone: 'ok' });
+      }
       goodPos = cur;
       lastMove = now;
       stallStage = 0;
@@ -635,6 +909,7 @@
       lastMove = now;
       const target = Math.min(cur + 1, v.duration - 1);
       log('Video bloccato da 12 secondi: salto avanti di 1 secondo.', tabState());
+      showToast('recovery', 'Streaming bloccato: provo a farlo ripartire…', { tone: 'warn', ms: 6000 });
       v.currentTime = target;
       lastPos = target;
     } else if (stallStage === 1) {
@@ -745,11 +1020,11 @@
   chrome.storage.local.get({
     ...KW_DEFAULTS, cinema: false, series: {}, sleep: null, pendingPlayAt: 0, resume: null
   }).then((s) => {
-    for (const key of Object.keys(KW_DEFAULTS)) settings[key] = s[key];
     cinema = s.cinema;
     series = s.series || {};
     sleep = s.sleep;
     loaded = true;
+    applySettings(s);
 
     // Posizione da ripristinare dopo una ricarica per streaming bloccato.
     const r = s.resume;

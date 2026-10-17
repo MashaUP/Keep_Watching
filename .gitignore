@@ -17,3 +17,9 @@ __pycache__/
 # Editor
 .vscode/
 .idea/
+
+# Test end-to-end: video generati da tests/e2e/make_clips.sh
+tests/e2e/clip-*.webm
+
+# Node.js (i test non hanno dipendenze, ma per sicurezza)
+node_modules/

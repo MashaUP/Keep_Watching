@@ -8,6 +8,9 @@
  *
  * Perché non lo schermo intero "vero": il browser lo concede solo in risposta a un
  * click dell'utente, e al cambio episodio il player viene ricreato da zero.
+ *
+ * Nelle stesse pagine risponde anche alle verifiche delle scorciatoie (campo di testo
+ * con il focus) e inoltra Esc per chiudere la guida alle scorciatoie.
  */
 (() => {
   'use strict';
@@ -70,10 +73,24 @@
     if (area === 'local' && changes.cinema) apply(changes.cinema.newValue);
   });
 
-  // Esc chiude la modalità (se il focus è su questa pagina e non sul player).
+  // Esc chiude la modalità (se il focus è su questa pagina e non sul player) e la guida
+  // alle scorciatoie, che sta nel player: il service worker inoltra la richiesta.
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && active) exitCinema();
+    if (e.key !== 'Escape') return;
+    if (active) exitCinema();
+    chrome.runtime.sendMessage({ type: 'kwEscape' }).catch(() => {});
   }, true);
+
+  // Scorciatoie: prima di eseguirle, il service worker chiede a tutti i frame se si sta
+  // scrivendo in un campo di testo. Risponde solo il frame che ha il focus su un campo.
+  const isEditable = (el) => Boolean(el && (el.isContentEditable || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' ||
+    (el.tagName === 'INPUT' && !['button', 'checkbox', 'radio', 'range', 'submit', 'reset', 'color', 'file', 'image'].includes(el.type))));
+
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg && msg.type === 'kwIsEditing' && document.hasFocus() && isEditable(document.activeElement)) {
+      sendResponse({ editing: true });
+    }
+  });
 
   if (IS_TOP) window.addEventListener('pagehide', () => { if (active) exitCinema(); });
 })();

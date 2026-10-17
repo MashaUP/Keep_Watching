@@ -2,177 +2,434 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Keep_Watching</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header>
-    <img src="../../icons/icon48.png" alt="" width="28" height="28">
-    <h1>Keep_Watching</h1>
-    <span class="version" id="version"></span>
-  </header>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5.5v13l10.5-6.5z"/><path d="M19.5 5.5v13"/></symbol>
+      <symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="2"/><path d="M8.5 20h7"/><path d="M12 17v3"/><path d="M14 8.5h4"/></symbol>
+      <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c.8-3.8 3.6-5.5 7-5.5s6.2 1.7 7 5.5"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20h16"/><path d="M7 16.5V11"/><path d="M12 16.5V6"/><path d="M17 16.5v-3.5"/></symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></symbol>
+      <symbol id="i-cup" viewBox="0 0 24 24"><path d="M4.5 9h12v5.5a5 5 0 0 1-5 5h-2a5 5 0 0 1-5-5z"/><path d="M16.5 10.5h1.2a2.5 2.5 0 0 1 0 5h-1.5"/><path d="M9 4.5c0 1 1 1.3 1 2.3"/><path d="M12.5 4.5c0 1 1 1.3 1 2.3"/></symbol>
+      <symbol id="i-external" viewBox="0 0 24 24"><path d="M13.5 4.5H19.5V10.5"/><path d="M19.5 4.5 11 13"/><path d="M17 14v5.5H4.5V7H10"/></symbol>
+      <symbol id="i-key" viewBox="0 0 24 24"><rect x="2.5" y="6.5" width="19" height="11" rx="2"/><path d="M6 10h.01M9 10h.01M12 10h.01M15 10h.01M18 10h.01M7.5 14h9"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.5A7.5 7.5 0 0 1 9.5 4.5a7.5 7.5 0 1 0 10 10z"/></symbol>
+      <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5.5 13.5h6L10.5 21 18.5 10h-6z"/></symbol>
+      <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 12V6.5a1.5 1.5 0 0 1 3 0V11"/><path d="M11 10.5V5a1.5 1.5 0 0 1 3 0v5.5"/><path d="M14 10.5V6.5a1.5 1.5 0 0 1 3 0v6.5c0 4-2.3 7-6 7-2.6 0-4.2-1.3-5.4-3.4L4 13.6a1.4 1.4 0 0 1 2.3-1.6L8 14"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m8.5 12.2 2.4 2.4 4.7-5"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6.5 16.5V11a5.5 5.5 0 0 1 11 0v5.5l1.5 2h-14z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="m7.5 10.5 4.5 4.5 4.5-4.5"/><path d="M4.5 19.5h15"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M4.5 19.5h15"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 12.5h9l1-12.5"/></symbol>
+      <symbol id="i-tab" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3 9h18"/></symbol>
+      <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.6h.01"/></symbol>
+    </defs>
+  </svg>
 
-  <section class="master">
-    <label class="row">
-      <span class="text">
-        <span class="title">Estensione attiva</span>
-        <span class="hint" id="shortcutHint"></span>
-      </span>
-      <input type="checkbox" class="switch" id="enabled">
-    </label>
-  </section>
+  <div class="app">
+    <aside class="nav">
+      <div class="brand">
+        <img src="../../icons/icon48.png" alt="" width="30" height="30">
+        <div>
+          <div class="brand-name">Keep_Watching</div>
+          <div class="brand-ver" id="version"></div>
+        </div>
+      </div>
 
-  <main id="options">
-    <h2>Episodi</h2>
+      <nav aria-label="Sezioni">
+        <button type="button" data-section="overview"><svg><use href="#i-home"/></svg><span>Panoramica</span></button>
+        <button type="button" data-section="playback"><svg><use href="#i-play"/></svg><span>Riproduzione</span></button>
+        <button type="button" data-section="ui"><svg><use href="#i-screen"/></svg><span>Interfaccia sul video</span></button>
+        <button type="button" data-section="profiles"><svg><use href="#i-user"/></svg><span>Profili</span></button>
+        <button type="button" data-section="stats"><svg><use href="#i-chart"/></svg><span>Statistiche</span></button>
+        <button type="button" data-section="updates"><svg><use href="#i-refresh"/></svg><span>Aggiornamenti</span><i class="dot" id="navUpdateDot" hidden></i></button>
+        <button type="button" data-section="kofi"><svg><use href="#i-cup"/></svg><span>Sostieni</span></button>
+      </nav>
 
-    <label class="row">
-      <span class="text">
-        <span class="title">Prossimo episodio automatico</span>
-        <span class="hint">A fine episodio passa al successivo</span>
-      </span>
-      <input type="checkbox" class="switch" id="autoNext">
-    </label>
+      <div class="nav-foot">
+        <span class="status-pill" id="statusPill"></span>
+        <button type="button" class="icon-btn" id="openTab" title="Apri in una scheda" aria-label="Apri il menu in una scheda"><svg><use href="#i-tab"/></svg></button>
+      </div>
+    </aside>
 
-    <label class="row">
-      <span class="text">
-        <span class="title">Avvia il nuovo episodio</span>
-        <span class="hint">Se si carica in pausa, lo fa partire</span>
-      </span>
-      <input type="checkbox" class="switch" id="autoPlay">
-    </label>
+    <main id="main">
 
-    <label class="row">
-      <span class="text">
-        <span class="title">Resta a schermo intero</span>
-        <span class="hint">Tra un episodio e l'altro. Esc per uscire</span>
-      </span>
-      <input type="checkbox" class="switch" id="keepFullscreen">
-    </label>
+      <!-- ======================= PANORAMICA ======================= -->
+      <section data-section="overview">
+        <header class="sec-head"><h1>Panoramica</h1></header>
 
-    <div class="group" id="nextOptions">
-      <label class="field">
-        <span class="title">Conto alla rovescia</span>
-        <select id="countdown">
-          <option value="0">No, cambia subito</option>
-          <option value="5">5 secondi</option>
-          <option value="10">10 secondi</option>
-          <option value="15">15 secondi</option>
-          <option value="20">20 secondi</option>
-        </select>
-      </label>
+        <div class="banner ok" id="installBanner" hidden>
+          <svg><use href="#i-check"/></svg>
+          <div class="banner-body"><b id="installTitle"></b><span id="installText"></span></div>
+          <button type="button" class="link" id="installClose">Chiudi</button>
+        </div>
 
-      <div class="field">
-        <label class="title" for="skipCredits">Salta i titoli di coda</label>
-        <select id="skipCredits">
-          <option value="0">No, aspetta la fine</option>
-          <option value="15">15 secondi prima della fine</option>
-          <option value="30">30 secondi prima della fine</option>
-          <option value="60">1 minuto prima della fine</option>
-          <option value="90">90 secondi prima della fine</option>
-          <option value="120">2 minuti prima della fine</option>
-          <option value="custom">Personalizzato…</option>
-        </select>
-        <div class="custom" id="customSkip" hidden>
-          <label class="num">
-            <input type="number" id="skipMin" min="0" max="59" step="1" inputmode="numeric" aria-label="Minuti">
-            <span>min</span>
-          </label>
-          <label class="num">
-            <input type="number" id="skipSec" min="0" max="59" step="1" inputmode="numeric" aria-label="Secondi">
-            <span>sec</span>
+        <div class="card master">
+          <label class="row">
+            <span class="row-text">
+              <span class="row-title">Estensione attiva</span>
+              <span class="row-hint" id="shortcutHint"></span>
+            </span>
+            <input type="checkbox" class="switch" data-setting="enabled">
           </label>
         </div>
-        <p class="hint" id="skipHint" hidden></p>
-        <p class="hint">Le serie con i titoli segnati dal player usano il loro valore.</p>
-      </div>
 
-      <div class="field">
-        <label class="title" for="stopAfter">Chiedi se continuare dopo</label>
-        <select id="stopAfter">
-          <option value="0">Mai, continua sempre</option>
-          <option value="1">1 episodio</option>
-          <option value="2">2 episodi</option>
-          <option value="3">3 episodi</option>
-          <option value="5">5 episodi</option>
-          <option value="10">10 episodi</option>
-        </select>
-      </div>
+        <div class="card" id="whatsNew" hidden>
+          <div class="card-head"><h2 id="whatsNewTitle"></h2><button type="button" class="link" id="whatsNewClose">Chiudi</button></div>
+          <ul class="notes" id="whatsNewList"></ul>
+        </div>
 
-      <div class="streak" id="streakBox">
-        <span id="streakText"></span>
-        <button type="button" id="resetStreak">Azzera</button>
-      </div>
-    </div>
+        <div class="tiles status-tiles">
+          <div class="tile"><span class="tile-label">Sul player</span><span class="tile-value" id="stNow"></span><span class="tile-sub" id="stNowSub"></span></div>
+          <button type="button" class="tile tile-link" data-goto="profiles"><span class="tile-label">Profilo</span><span class="tile-value" id="stProfile"></span><span class="tile-sub" id="stProfileSub"></span></button>
+          <div class="tile"><span class="tile-label">Timer di spegnimento</span><span class="tile-value" id="stSleep"></span><span class="tile-sub" id="stSleepSub"></span></div>
+          <div class="tile"><span class="tile-label">Episodi di fila</span><span class="tile-value" id="stStreak"></span><span class="tile-sub" id="stStreakSub"></span></div>
+        </div>
 
-    <h2>Timer di spegnimento</h2>
+        <button type="button" class="banner info update-hint" id="overviewUpdate" data-goto="updates" hidden>
+          <svg><use href="#i-refresh"/></svg>
+          <span class="banner-body"><b id="overviewUpdateText"></b><span>Apri Aggiornamenti per le novità e il download.</span></span>
+        </button>
 
-    <div class="block">
-      <div class="field">
-        <select id="sleepMode" aria-label="Timer di spegnimento">
-          <option value="off">Disattivato</option>
-          <option value="15">Tra 15 minuti</option>
-          <option value="30">Tra 30 minuti</option>
-          <option value="45">Tra 45 minuti</option>
-          <option value="60">Tra 1 ora</option>
-          <option value="90">Tra 1 ora e mezza</option>
-          <option value="episode">Alla fine dell'episodio</option>
-          <option value="season">Alla fine della stagione</option>
-        </select>
-        <p class="hint" id="sleepHint" hidden></p>
-      </div>
-    </div>
+        <div class="card" id="nightTimer">
+          <div class="card-head"><h2>Timer di spegnimento</h2></div>
+          <select data-sleep aria-label="Timer di spegnimento"></select>
+          <p class="hint" data-sleep-hint hidden></p>
+        </div>
 
-    <label class="row">
-      <span class="text">
-        <span class="title">Abbassa il volume prima</span>
-        <span class="hint">Dissolvenza negli ultimi 30 secondi</span>
-      </span>
-      <input type="checkbox" class="switch" id="sleepFade">
-    </label>
+        <div class="card">
+          <div class="card-head"><h2>Accesso rapido</h2></div>
+          <label class="row"><span class="row-text"><span class="row-title">Prossimo episodio automatico</span></span><input type="checkbox" class="switch" data-setting="autoNext"></label>
+          <label class="row"><span class="row-text"><span class="row-title">Avvia il nuovo episodio</span></span><input type="checkbox" class="switch" data-setting="autoPlay"></label>
+          <label class="row"><span class="row-text"><span class="row-title">Resta a schermo intero</span></span><input type="checkbox" class="switch" data-setting="keepFullscreen"></label>
+          <div class="actions">
+            <button type="button" class="btn" data-show-guide><svg><use href="#i-key"/></svg>Guida alle scorciatoie sul player</button>
+          </div>
+          <p class="hint" data-guide-result hidden></p>
+        </div>
 
-    <h2>Intro delle serie</h2>
+        <a class="kofi-line" target="_blank" rel="noopener noreferrer" data-kofi-link hidden>
+          <svg><use href="#i-cup"/></svg> Ti è utile? Offrimi un caffè su Ko-fi
+        </a>
+      </section>
 
-    <label class="row">
-      <span class="text">
-        <span class="title">Salta l'intro</span>
-        <span class="hint">Nelle serie in cui l'hai segnata dal player</span>
-      </span>
-      <input type="checkbox" class="switch" id="introSkip">
-    </label>
+      <!-- ======================= RIPRODUZIONE ======================= -->
+      <section data-section="playback" hidden>
+        <header class="sec-head"><h1>Riproduzione</h1><p>Cambio episodio, intro e titoli, salti, timer e scorciatoie.</p></header>
 
-    <div class="block">
-      <p class="hint" id="seriesEmpty">Nessuna serie salvata. Sul player usa "Fine intro qui" e "Inizio titoli qui".</p>
-      <ul class="series" id="seriesList"></ul>
-    </div>
+        <div class="card">
+          <div class="card-head"><h2>Cambio episodio</h2></div>
+          <label class="row"><span class="row-text"><span class="row-title">Prossimo episodio automatico</span><span class="row-hint">A fine episodio passa al successivo</span></span><input type="checkbox" class="switch" data-setting="autoNext"></label>
+          <label class="row"><span class="row-text"><span class="row-title">Avvia il nuovo episodio</span><span class="row-hint">Se si carica in pausa, lo fa partire</span></span><input type="checkbox" class="switch" data-setting="autoPlay"></label>
+          <div class="field">
+            <label class="field-label" for="countdown">Conto alla rovescia</label>
+            <select id="countdown" data-setting="countdown" data-type="number">
+              <option value="0">No, cambia subito</option>
+              <option value="5">5 secondi</option>
+              <option value="10">10 secondi</option>
+              <option value="15">15 secondi</option>
+              <option value="20">20 secondi</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="field-label" for="stopAfter">Chiedi se continuare dopo</label>
+            <select id="stopAfter" data-setting="stopAfter" data-type="number">
+              <option value="0">Mai, continua sempre</option>
+              <option value="1">1 episodio</option>
+              <option value="2">2 episodi</option>
+              <option value="3">3 episodi</option>
+              <option value="5">5 episodi</option>
+              <option value="10">10 episodi</option>
+            </select>
+          </div>
+          <div class="inline-note" id="streakBox" hidden>
+            <span id="streakText"></span>
+            <button type="button" class="link" id="resetStreak">Azzera</button>
+          </div>
+        </div>
 
-    <h2>Altro</h2>
+        <div class="card">
+          <div class="card-head"><h2>Intro e titoli di coda</h2></div>
+          <label class="row"><span class="row-text"><span class="row-title">Salta l'intro</span><span class="row-hint">Nelle serie in cui hai premuto "Fine intro qui" sul player</span></span><input type="checkbox" class="switch" data-setting="introSkip"></label>
+          <div class="field">
+            <label class="field-label" for="skipCredits">Salta i titoli di coda</label>
+            <select id="skipCredits">
+              <option value="0">No, aspetta la fine</option>
+              <option value="15">15 secondi prima della fine</option>
+              <option value="30">30 secondi prima della fine</option>
+              <option value="60">1 minuto prima della fine</option>
+              <option value="90">90 secondi prima della fine</option>
+              <option value="120">2 minuti prima della fine</option>
+              <option value="custom">Personalizzato…</option>
+            </select>
+            <div class="custom" id="customSkip" hidden>
+              <label class="num"><input type="number" id="skipMin" min="0" max="59" step="1" inputmode="numeric" aria-label="Minuti"><span>min</span></label>
+              <label class="num"><input type="number" id="skipSec" min="0" max="59" step="1" inputmode="numeric" aria-label="Secondi"><span>sec</span></label>
+            </div>
+            <p class="hint" id="skipHint" hidden></p>
+            <p class="hint">Le serie con i titoli segnati dal player usano il loro valore.</p>
+          </div>
+          <div class="subhead">Serie salvate</div>
+          <p class="hint" id="seriesEmpty">Nessuna serie salvata. Sul player usa "Fine intro qui" e "Inizio titoli qui".</p>
+          <ul class="series" id="seriesList"></ul>
+        </div>
 
-    <label class="row">
-      <span class="text">
-        <span class="title">Pausa quando cambi scheda</span>
-        <span class="hint">Riprende quando torni sul video</span>
-      </span>
-      <input type="checkbox" class="switch" id="pauseOnHidden">
-    </label>
+        <div class="card">
+          <div class="card-head"><h2>Salto avanti</h2></div>
+          <p class="hint">Durata del pulsante sul player e della scorciatoia. Puoi premerlo più volte di seguito.</p>
+          <div class="seg" data-setting="quickSkip" data-type="number" role="radiogroup" aria-label="Durata del salto avanti">
+            <button type="button" data-value="15">15 s</button>
+            <button type="button" data-value="30">30 s</button>
+            <button type="button" data-value="45">45 s</button>
+            <button type="button" data-value="60">60 s</button>
+            <button type="button" data-value="90">90 s</button>
+          </div>
+        </div>
 
-    <label class="row">
-      <span class="text">
-        <span class="title">Riparti se lo streaming si blocca</span>
-        <span class="hint">Salto avanti, poi ricarica dal punto in cui eri</span>
-      </span>
-      <input type="checkbox" class="switch" id="watchdog">
-    </label>
+        <div class="card">
+          <div class="card-head"><h2>Timer di spegnimento</h2></div>
+          <select data-sleep aria-label="Timer di spegnimento"></select>
+          <p class="hint" data-sleep-hint hidden></p>
+          <label class="row"><span class="row-text"><span class="row-title">Abbassa il volume prima</span><span class="row-hint">Dissolvenza negli ultimi 30 secondi</span></span><input type="checkbox" class="switch" data-setting="sleepFade"></label>
+        </div>
 
-    <label class="row">
-      <span class="text">
-        <span class="title">Notifiche sul desktop</span>
-        <span class="hint">Fine episodi, limite, timer e problemi</span>
-      </span>
-      <input type="checkbox" class="switch" id="notifyEnd">
-    </label>
-  </main>
+        <div class="card">
+          <div class="card-head"><h2>Altre automazioni</h2></div>
+          <label class="row"><span class="row-text"><span class="row-title">Resta a schermo intero</span><span class="row-hint">Tra un episodio e l'altro. Esc per uscire</span></span><input type="checkbox" class="switch" data-setting="keepFullscreen"></label>
+          <label class="row"><span class="row-text"><span class="row-title">Riparti se lo streaming si blocca</span><span class="row-hint">Salto avanti, poi ricarica dal punto in cui eri</span></span><input type="checkbox" class="switch" data-setting="watchdog"></label>
+          <label class="row"><span class="row-text"><span class="row-title">Pausa quando cambi scheda</span><span class="row-hint">Riprende quando torni sul video</span></span><input type="checkbox" class="switch" data-setting="pauseOnHidden"></label>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Scorciatoie da tastiera</h2></div>
+          <ul class="shortcuts" id="shortcutList"></ul>
+          <div class="actions">
+            <button type="button" class="btn" id="configureShortcuts"><svg><use href="#i-external"/></svg>Configura scorciatoie</button>
+            <button type="button" class="btn" data-show-guide><svg><use href="#i-key"/></svg>Mostra la guida sul player</button>
+          </div>
+          <p class="hint" data-guide-result hidden></p>
+          <p class="hint">Le combinazioni si cambiano nella pagina delle scorciatoie del browser. Alt+Shift+K attiva o sospende l'estensione (sulle tastiere italiane Shift è il tasto Maiusc).</p>
+        </div>
+      </section>
+
+      <!-- ======================= INTERFACCIA SUL VIDEO ======================= -->
+      <section data-section="ui" hidden>
+        <header class="sec-head"><h1>Interfaccia sul video</h1><p>Quali messaggi vedere sul player e come appare la barra dei controlli.</p></header>
+
+        <div class="card">
+          <div class="card-head"><h2>Popup sul video</h2></div>
+          <label class="row strong"><span class="row-text"><span class="row-title">Nascondi tutti i popup sul video</span><span class="row-hint">Le automazioni continuano a funzionare. Le tue scelte qui sotto restano salvate.</span></span><input type="checkbox" class="switch" data-setting="popupsHidden"></label>
+          <div id="popupList" class="popup-list"></div>
+          <p class="hint">La guida alle scorciatoie compare sempre quando la chiedi tu.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Barra dei controlli</h2><button type="button" class="link" id="resetLook">Ripristina aspetto</button></div>
+          <div class="preview" id="preview" aria-hidden="true">
+            <div class="preview-video"><div class="pv-bar" id="pvBar"><span class="pv-btn">+60 s</span><span class="pv-btn">Fine intro qui</span><span class="pv-btn">Stop a fine episodio</span><span class="pv-btn">?</span></div></div>
+          </div>
+          <div class="field"><span class="field-label">Dimensione</span>
+            <div class="seg" data-setting="uiSize" role="radiogroup" aria-label="Dimensione">
+              <button type="button" data-value="compact">Compatta</button><button type="button" data-value="standard">Standard</button><button type="button" data-value="large">Grande</button>
+            </div></div>
+          <div class="field"><span class="field-label">Densità</span>
+            <div class="seg" data-setting="uiDensity" role="radiogroup" aria-label="Densità">
+              <button type="button" data-value="dense">Densa</button><button type="button" data-value="standard">Standard</button><button type="button" data-value="spaced">Spaziata</button>
+            </div></div>
+          <div class="field"><label class="field-label" for="uiOpacity">Opacità dello sfondo <b id="opacityValue"></b></label>
+            <input type="range" id="uiOpacity" min="40" max="100" step="5" data-setting="uiOpacity" data-type="number"></div>
+          <div class="field"><span class="field-label">Posizione</span>
+            <div class="seg" data-setting="uiPosition" role="radiogroup" aria-label="Posizione">
+              <button type="button" data-value="top-left">In alto a sinistra</button><button type="button" data-value="top-center">Al centro</button><button type="button" data-value="top-right">In alto a destra</button>
+            </div></div>
+          <div class="field"><label class="field-label" for="uiAutoHide">Nascondi la barra</label>
+            <select id="uiAutoHide" data-setting="uiAutoHide" data-type="number">
+              <option value="3">Dopo 3 secondi senza movimento</option>
+              <option value="5">Dopo 5 secondi</option>
+              <option value="10">Dopo 10 secondi</option>
+              <option value="0">Mai: resta sempre visibile</option>
+            </select></div>
+          <label class="row"><span class="row-text"><span class="row-title">Modalità minimale</span><span class="row-hint">Solo "Salta intro" e il salto avanti</span></span><input type="checkbox" class="switch" data-setting="uiMinimal"></label>
+          <label class="row"><span class="row-text"><span class="row-title">Riduci le animazioni</span><span class="row-hint">Anche senza questa opzione si rispetta l'impostazione di sistema</span></span><input type="checkbox" class="switch" data-setting="uiReduceMotion"></label>
+          <div class="field"><label class="field-label" for="guideAutoClose">Guida alle scorciatoie</label>
+            <select id="guideAutoClose" data-setting="guideAutoClose" data-type="number">
+              <option value="0">Resta aperta finché la chiudi</option>
+              <option value="10">Si chiude da sola dopo 10 secondi</option>
+              <option value="20">Si chiude da sola dopo 20 secondi</option>
+            </select></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Notifiche sul desktop</h2></div>
+          <label class="row"><span class="row-text"><span class="row-title">Notifiche sul desktop</span><span class="row-hint">Serie finita, limite di episodi, fine stagione con la scheda nascosta</span></span><input type="checkbox" class="switch" data-setting="notifyEnd"></label>
+          <p class="hint">Sono indipendenti dai popup sul video. Gli avvisi di problemi (pulsante non trovato, streaming che non riparte) arrivano sempre.</p>
+        </div>
+      </section>
+
+      <!-- ======================= PROFILI ======================= -->
+      <section data-section="profiles" hidden>
+        <header class="sec-head"><h1>Profili di comportamento</h1><p>Un profilo cambia alcune impostazioni in un colpo solo. Dopo puoi modificarle liberamente.</p></header>
+        <div class="profiles" id="profileList" role="radiogroup" aria-label="Profilo"></div>
+        <div class="banner warn" id="profileCustom" hidden>
+          <svg><use href="#i-info"/></svg>
+          <div class="banner-body"><b>Personalizzato</b><span id="profileCustomText"></span></div>
+          <button type="button" class="btn small" id="profileRestore">Ripristina il profilo</button>
+        </div>
+        <p class="hint">I profili non toccano mai il timer di spegnimento, il limite di episodi di fila, l'aspetto della barra, le scorciatoie e le statistiche.</p>
+      </section>
+
+      <!-- ======================= STATISTICHE ======================= -->
+      <section data-section="stats" hidden>
+        <header class="sec-head"><h1>Statistiche</h1><p>Solo su questo computer: niente account, niente invii.</p></header>
+
+        <div class="card">
+          <label class="row"><span class="row-text"><span class="row-title">Raccogli statistiche</span><span class="row-hint">Spegnendola, lo storico resta finché non lo azzeri</span></span><input type="checkbox" class="switch" data-setting="statsEnabled"></label>
+        </div>
+
+        <div class="seg range" id="statsRange" role="radiogroup" aria-label="Periodo">
+          <button type="button" data-value="today">Oggi</button><button type="button" data-value="7">7 giorni</button><button type="button" data-value="30">30 giorni</button>
+        </div>
+
+        <div class="tiles stat-tiles">
+          <div class="tile hero"><span class="tile-label">Tempo di visione</span><span class="tile-value" id="sPlay"></span><span class="tile-sub" id="sPlaySub"></span></div>
+          <div class="tile"><span class="tile-label">Sessioni</span><span class="tile-value" id="sSessions"></span></div>
+          <div class="tile"><span class="tile-label">Durata media</span><span class="tile-value" id="sAvg"></span></div>
+          <div class="tile"><span class="tile-label">Episodi completati</span><span class="tile-value" id="sCompleted"></span></div>
+          <div class="tile"><span class="tile-label">Intro saltate</span><span class="tile-value" id="sIntro"></span></div>
+          <div class="tile"><span class="tile-label">Titoli saltati</span><span class="tile-value" id="sCredits"></span></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2 id="chartTitle">Tempo di visione al giorno</h2></div>
+          <div class="chart" id="chart"></div>
+          <details class="table-view"><summary>Mostra i valori in tabella</summary><table id="chartTable"></table></details>
+        </div>
+
+        <details class="card notes-card">
+          <summary>Come si misurano</summary>
+          <ul class="notes">
+            <li><b>Tempo di visione:</b> solo mentre il video avanza davvero. Pausa, caricamento e salti non contano; a velocità 2× conta il tempo reale.</li>
+            <li><b>Sessione:</b> inizia quando parte un video e finisce dopo 30 minuti senza visione, anche cambiando episodio. Conta nel giorno in cui inizia.</li>
+            <li><b>Episodio completato:</b> fine o inizio dei titoli raggiunti dopo aver guardato almeno metà di quello che restava (minimo 1 minuto). Lo stesso episodio non conta due volte in 6 ore.</li>
+            <li><b>Intro e titoli saltati:</b> solo i salti fatti dall'estensione, non quelli manuali.</li>
+            <li><b>Stimato:</b> giorni con un intervallo misurato male (scheda sospesa dal browser): il valore è plausibile ma non preciso al secondo.</li>
+            <li>Si conservano gli ultimi 400 giorni.</li>
+          </ul>
+        </details>
+
+        <div class="card">
+          <div class="card-head"><h2>Esporta e importa</h2></div>
+          <p class="hint">File con soli numeri e date: nessun titolo, nessun indirizzo. Separati dal backup delle impostazioni.</p>
+          <div class="actions">
+            <button type="button" class="btn" id="exportCsv"><svg><use href="#i-download"/></svg>Esporta CSV</button>
+            <button type="button" class="btn" id="exportJson"><svg><use href="#i-download"/></svg>Esporta JSON</button>
+          </div>
+          <div class="import">
+            <div class="field-label">Importa un file JSON esportato</div>
+            <div class="seg small" id="importMode" role="radiogroup" aria-label="Modalità di importazione">
+              <button type="button" data-value="merge" aria-checked="true" class="on">Unisci</button><button type="button" data-value="replace">Sostituisci</button>
+            </div>
+            <p class="hint" id="importModeHint"></p>
+            <div class="actions">
+              <label class="btn" id="importLabel"><svg><use href="#i-upload"/></svg>Scegli il file<input type="file" id="importFile" accept=".json,application/json" hidden></label>
+              <button type="button" class="btn" id="importInTab" hidden><svg><use href="#i-tab"/></svg>Importa da una scheda</button>
+            </div>
+            <div class="confirm-box" id="importConfirm" hidden>
+              <span id="importConfirmText"></span>
+              <div class="actions"><button type="button" class="btn" id="importCancel">Annulla</button><button type="button" class="btn danger" id="importGo">Sostituisci lo storico</button></div>
+            </div>
+            <p class="hint" id="importResult" role="status" hidden></p>
+          </div>
+          <p class="hint" id="exportResult" role="status" hidden></p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Azzera statistiche</h2></div>
+          <p class="hint">Elimina tutto lo storico locale delle statistiche. Impostazioni, profili, timer e scorciatoie restano come sono.</p>
+          <div class="actions"><button type="button" class="btn danger-outline" id="resetStats"><svg><use href="#i-trash"/></svg>Azzera statistiche</button></div>
+          <div class="confirm-box" id="resetConfirm" hidden>
+            <span>Lo storico locale verrà eliminato e non si potrà recuperare (a meno di un file esportato).</span>
+            <div class="actions"><button type="button" class="btn" id="resetCancel">Annulla</button><button type="button" class="btn danger" id="resetGo">Elimina lo storico</button></div>
+          </div>
+          <p class="hint" id="resetResult" role="status" hidden></p>
+        </div>
+      </section>
+
+      <!-- ======================= AGGIORNAMENTI ======================= -->
+      <section data-section="updates" hidden>
+        <header class="sec-head"><h1>Aggiornamenti</h1><p>Versione installata, ultima versione pubblicata e novità.</p></header>
+
+        <div class="card">
+          <div class="versions">
+            <div><span class="tile-label">Installata</span><b id="uInstalled"></b></div>
+            <div><span class="tile-label">Ultima su GitHub</span><b id="uLatest">—</b><span class="tile-sub" id="uLatestDate"></span></div>
+          </div>
+          <p class="update-status" id="uStatus" role="status"></p>
+          <p class="hint" id="uLastCheck"></p>
+          <div class="actions">
+            <button type="button" class="btn primary" id="checkUpdate"><svg><use href="#i-refresh"/></svg>Cerca aggiornamento</button>
+            <button type="button" class="btn" id="updateAction" hidden></button>
+          </div>
+          <div id="uNotesBox" hidden>
+            <div class="subhead" id="uNotesTitle"></div>
+            <ul class="notes" id="uNotes"></ul>
+          </div>
+          <div class="install" id="installSteps" hidden>
+            <div class="subhead">Come installarlo</div>
+            <ol>
+              <li>Estrai lo zip scaricato con "Estrai qui" nella <b>stessa cartella</b> in cui avevi estratto la versione attuale, sostituendo i file: la cartella <code>Keep_Watching</code> deve essere quella caricata in <code>brave://extensions</code>.</li>
+              <li>Premi il pulsante qui sotto: l'estensione si ricarica con i file nuovi.</li>
+              <li>Riapri questo menu: ti dirà se l'aggiornamento è stato installato davvero.</li>
+            </ol>
+            <button type="button" class="btn primary" id="reloadExt">Ho estratto lo zip: ricarica l'estensione</button>
+          </div>
+          <p class="hint" id="uPrerelease" hidden></p>
+          <p class="hint source">Fonte: <a target="_blank" rel="noopener noreferrer" id="repoLink"></a> <span id="uSource"></span></p>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Registro delle versioni</h2></div>
+          <p class="hint" id="historyEmpty">Premi "Cerca aggiornamento" per caricare il registro da GitHub.</p>
+          <div class="history" id="historyList"></div>
+        </div>
+
+        <details class="card notes-card" id="localChangelog">
+          <summary>Novità della versione installata</summary>
+          <div id="localChangelogBody"></div>
+        </details>
+
+        <div class="card">
+          <div class="card-head"><h2>Preferenze</h2></div>
+          <label class="row"><span class="row-text"><span class="row-title">Controlla una volta al giorno</span><span class="row-hint">All'apertura di questo menu, al massimo una richiesta a GitHub al giorno</span></span><input type="checkbox" class="switch" data-setting="updateAutoCheck"></label>
+          <label class="row"><span class="row-text"><span class="row-title">Mostra le novità dopo un aggiornamento</span><span class="row-hint">Una volta per versione, qui nel menu (mai sul video)</span></span><input type="checkbox" class="switch" data-setting="showWhatsNew"></label>
+        </div>
+      </section>
+
+      <!-- ======================= KO-FI ======================= -->
+      <section data-section="kofi" hidden>
+        <header class="sec-head"><h1>Sostieni Keep_Watching</h1></header>
+        <div class="card kofi">
+          <svg class="kofi-cup"><use href="#i-cup"/></svg>
+          <p>Ti piace Keep_Watching? Se ti è utile, puoi sostenere il progetto con una piccola donazione. Ogni contributo aiuta a dedicare più tempo allo sviluppo e al miglioramento dell'estensione. Grazie per il supporto!</p>
+          <a class="btn kofi-btn" target="_blank" rel="noopener noreferrer" data-kofi-link hidden>
+            <svg><use href="#i-cup"/></svg>Offrimi un caffè su Ko-fi
+          </a>
+          <p class="hint">Si apre ko-fi.com in una nuova scheda. Keep_Watching resta gratuita, senza funzioni a pagamento, e non registra né conta i click.</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
 
   <script src="../defaults.js"></script>
+  <script src="../lib/stats.js"></script>
+  <script src="../lib/updates.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

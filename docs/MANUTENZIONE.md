@@ -1,6 +1,6 @@
 # Manutenzione di Keep_Watching
 
-Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando il sito cambia e come diagnosticare i problemi. Le informazioni sul sito sono state verificate sul sito reale durante lo sviluppo (settembre 2026, JW Player 8.36.4); le funzioni aggiunte nella 1.2 sono state provate anche su un sito di prova con la stessa struttura (vedi [sezione 11](#11-schermo-intero-tra-episodi-notifiche-e-badge)).
+Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando il sito cambia e come diagnosticare i problemi. Le informazioni sul sito sono state verificate sul sito reale durante lo sviluppo (settembre 2026, JW Player 8.36.4); le funzioni aggiunte dalla 1.2 in poi sono state provate su un sito di prova con la stessa struttura, con test automatici dalla 1.4 (vedi [sezione 19](#19-test)).
 
 ## Indice
 
@@ -17,6 +17,12 @@ Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando i
 11. [Schermo intero tra episodi, notifiche e badge](#11-schermo-intero-tra-episodi-notifiche-e-badge)
 12. [Intro, titoli per serie, timer di spegnimento](#12-intro-titoli-per-serie-timer-di-spegnimento)
 13. [Streaming bloccato](#13-streaming-bloccato)
+14. [Impostazioni, validazione e migrazione](#14-impostazioni-validazione-e-migrazione)
+15. [Popup sul video, profili e aspetto](#15-popup-sul-video-profili-e-aspetto)
+16. [Scorciatoie e guida](#16-scorciatoie-e-guida)
+17. [Statistiche](#17-statistiche)
+18. [Aggiornamenti da GitHub](#18-aggiornamenti-da-github)
+19. [Test](#19-test)
 
 ---
 
@@ -55,17 +61,20 @@ Dati osservati:
 | File | Dove gira | Compito |
 |---|---|---|
 | `src/player.js` | Player (`vixcloud.co/embed/*`) | Rileva la fine dell'episodio, gestisce conto alla rovescia, limite e notifiche, clicca "prossimo episodio", avvia il nuovo episodio |
-| `src/panel.js` | Player (`vixcloud.co/embed/*`) | Riquadro sul player usato da `player.js` (conto alla rovescia e domande), con stile isolato in Shadow DOM |
-| `src/toolbar.js` | Player (`vixcloud.co/embed/*`) | Barra di pulsanti in alto a destra sul player, usata da `player.js` |
+| `src/panel.js` | Player (`vixcloud.co/embed/*`) | Riquadro e avvisi brevi sul player usati da `player.js`, tema e variabili d'aspetto, stile isolato in Shadow DOM |
+| `src/toolbar.js` | Player (`vixcloud.co/embed/*`) | Barra di pulsanti sul player, usata da `player.js` |
+| `src/guide.js` | Player (`vixcloud.co/embed/*`) | Guida alle scorciatoie sul player |
+| `src/lib/stats.js` | Player, service worker e popup | Statistiche: giorni, sessioni, riepiloghi, CSV, JSON, importazione (oggetto globale `KWStats`) |
+| `src/lib/updates.js` | Popup | Controllo degli aggiornamenti su GitHub e confronto delle versioni (oggetto globale `KWUpdates`) |
 | `src/recovery.js` | Pagine del sito (`*/iframe/*`) | Su richiesta ricarica l'iframe intermedio con `minute=N` |
 | `src/autoplay-permission.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | Aggiunge `allow="autoplay"` all'iframe del player e lo ricarica con il marcatore |
 | `src/cinema.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | In modalità cinema allarga a tutta la finestra l'iframe che porta al player; Esc per uscire |
-| `src/background.js` | Service worker | Badge, scorciatoia `toggle-enabled`, notifiche, schermo intero della finestra |
+| `src/background.js` | Service worker | Badge, scorciatoie, notifiche, schermo intero della finestra, unico scrittore delle statistiche, migrazione delle impostazioni, novità dopo un aggiornamento |
 | `rules.json` | Rete del browser | Blocca il caricamento del player senza marcatore `kw_autoplay=1` |
-| `src/defaults.js` | Service worker, player e popup | Opzioni predefinite; documenta tutte le chiavi di `chrome.storage.local` |
-| `src/popup/*` | Menu dell'icona | Legge e salva le opzioni |
+| `src/defaults.js` | Service worker, player e popup | Opzioni predefinite e validazione, profili, categorie di popup, comandi, link del progetto; documenta tutte le chiavi di `chrome.storage.local` |
+| `src/popup/*` | Menu dell'icona (anche in scheda con `?tab=1`) | Sezioni, impostazioni, statistiche, aggiornamenti |
 
-Nel player, `defaults.js`, `panel.js`, `toolbar.js` e `player.js` vengono caricati in quest'ordine (vedi `manifest.json`) e condividono le stesse variabili globali: `player.js` usa `KW_DEFAULTS`, `kwActiveSleep`, `kwFormatTime`, `kwCreatePanel` e `kwCreateToolbar` definiti negli altri.
+Nel player, `defaults.js`, `lib/stats.js`, `panel.js`, `toolbar.js`, `guide.js` e `player.js` vengono caricati in quest'ordine (vedi `manifest.json`) e condividono le stesse variabili globali: `player.js` usa `kwSanitize`, `kwPopupVisible`, `kwActiveSleep`, `kwFormatTime`, `KWStats`, `kwCreatePanel`, `kwCreateToast`, `kwCreateToolbar` e `kwCreateGuide` definiti negli altri. Il service worker carica `defaults.js` e `lib/stats.js` con `importScripts`.
 
 ### Flusso di un cambio episodio
 
@@ -234,10 +243,10 @@ window.__kwTest = 1   // poi cambia episodio e riesegui:
    - **patch** (1.0.**1**): correzione, per esempio un selettore o un dominio aggiornati;
    - **minor** (1.**1**.0): nuova opzione o funzionalità;
    - **major** (**2**.0.0): cambiamento di comportamento incompatibile.
-2. Aggiungi una sezione in `CHANGELOG.md`.
-3. Esegui la checklist di test qui sotto.
-4. Crea il pacchetto: `powershell -ExecutionPolicy Bypass -File tools/package.ps1` (Windows) oppure `sh tools/package.sh` (Linux, macOS, Git Bash). Nella radice viene creato `Keep_Watching-<versione>.zip`, che contiene la cartella `Keep_Watching/` con i soli file dell'estensione; lo zip della versione precedente viene eliminato e il nome dello zip nel README viene aggiornato.
-5. Commit, tag e push (lo zip va incluso nel commit):
+2. Aggiungi in cima a `CHANGELOG.md` una sezione `## [x.y.z] - AAAA-MM-GG` con `### Aggiunto`, `### Corretto`, `### Modificato`: il menu la mostra come "novità" dopo l'aggiornamento e, letta dal repository, come note della versione.
+3. Esegui i test ([sezione 19](#19-test)) e la checklist qui sotto.
+4. Crea il pacchetto: `powershell -ExecutionPolicy Bypass -File tools/package.ps1` (Windows) oppure `sh tools/package.sh` (Linux, macOS, Git Bash). Nella radice vengono creati `Keep_Watching-<versione>.zip`, che contiene la cartella `Keep_Watching/` con i soli file dell'estensione e `CHANGELOG.md`, e `version.json` con versione, data (presa dal CHANGELOG) e nome dello zip; lo zip della versione precedente viene eliminato e il nome dello zip nel README viene aggiornato.
+5. Commit, tag e push (zip e `version.json` vanno inclusi nel commit: sono quello che legge "Cerca aggiornamento"):
    ```
    git add -A
    git commit -m "v1.0.1: <descrizione>"
@@ -270,6 +279,16 @@ Con DevTools aperto, Ctrl+F8 attivo e filtro `Keep_Watching` in Console:
 - [ ] "Pausa quando cambi scheda": cambiando scheda il video va in pausa e riparte al ritorno.
 - [ ] "Personalizzato…" con un valore come 3 min 30 s cambia episodio al momento giusto, e riaprendo il menu il valore è ancora lì.
 - [ ] Con la finestra ridotta a icona durante il finale, il cambio episodio avviene e il nuovo episodio parte (o al più parte appena si torna sulla scheda).
+- [ ] "+60 s" resta sulla barra per tutto l'episodio e funziona 5 volte di seguito; con un'altra durata scelta nel menu l'etichetta cambia subito.
+- [ ] Alt+Shift+→, Alt+Shift+S e Alt+Shift+H funzionano sul player; scrivendo nella ricerca del sito non fanno nulla; Alt+Shift+K invariata.
+- [ ] La guida (Alt+Shift+H) segnala le scorciatoie non assegnate; Esc la chiude.
+- [ ] "Nascondi tutti i popup sul video": il cambio episodio avviene senza riquadro; spegnendolo le categorie tornano come prima.
+- [ ] Profilo Notturno: menu "Personalizzato" dopo una modifica, "Ripristina il profilo" la annulla.
+- [ ] Aspetto: opacità, posizione e dimensione si vedono sul player senza ricaricare.
+- [ ] Statistiche: dopo qualche minuto di visione il tempo cresce, la pausa non lo fa crescere; esportazione CSV aperta in Excel con le lettere accentate corrette.
+- [ ] "Cerca aggiornamento" con il repository pubblico reale: versione installata, ultima pubblicata, nessun errore.
+- [ ] Aggiornamento completo: scarica lo zip, estrai sopra la cartella, "Ho estratto lo zip: ricarica l'estensione", riapri il menu e controlla "Aggiornamento installato".
+- [ ] Il link Ko-fi apre https://ko-fi.com/mashaup in una nuova scheda.
 
 Per portare rapidamente un episodio alla fine, trascina la barra di avanzamento agli ultimi secondi.
 
@@ -344,7 +363,9 @@ La chiave è il titolo della serie, letto dal parametro `t` dell'URL del player 
 
 ### Barra di pulsanti
 
-`toolbar.js` crea un elemento in alto a destra dentro `.jwplayer`, con stile in Shadow DOM chiuso. Compare a ogni movimento del mouse sul documento del player e si nasconde dopo 3 secondi, con una logica propria: non dipende dalle classi interne con cui JW nasconde i suoi controlli. I pulsanti vengono ricalcolati a ogni `timeupdate` e la barra si ridisegna solo se cambiano.
+`toolbar.js` crea un elemento in alto (a destra, a sinistra o al centro, da `uiPosition`) dentro `.jwplayer`, con stile in Shadow DOM chiuso. Compare a ogni movimento del mouse sul documento del player e si nasconde dopo `uiAutoHide` secondi (0 = sempre visibile), con una logica propria: non dipende dalle classi interne con cui JW nasconde i suoi controlli. Resta visibile con il mouse sopra o con il focus su un pulsante. I pulsanti vengono ricalcolati a ogni `timeupdate` e la barra si ridisegna solo se cambiano; i click arrivano a un solo listener delegato, quindi ridisegnare non accumula listener. Se JW ricrea `.jwplayer`, l'elemento viene riattaccato al nuovo contenitore.
+
+**Perché "+60 s" spariva (fino alla 1.3.0).** La condizione era `else if (t < PLUS60_WINDOW_S)`: il pulsante esisteva solo nei primi 3 minuti e solo se non c'era "Salta intro". Dopo tre salti si superavano i 3 minuti e il pulsante non veniva più ridisegnato. Dalla 1.4.0 il salto avanti è sempre presente (tranne a meno di 1,5 secondi dalla fine), si ferma un secondo prima della fine e funziona anche con durata sconosciuta. Dopo un salto, l'evento `seeked` riallinea il controllo dello streaming bloccato, che altrimenti poteva scambiare salti ripetuti per un blocco.
 
 ### Timer di spegnimento
 
@@ -374,3 +395,89 @@ Controllo ogni 2 secondi in `player.js`, solo dopo che il video ha suonato almen
 Perché non si ricarica l'iframe del player: il suo token scade pochi secondi dopo la generazione della pagina (`410 Gone`). L'iframe intermedio invece genera ogni volta un token nuovo.
 
 Test fatti sul sito di prova: flusso video che si interrompe a metà, salto di 1 secondo, ricarica con `minute=0` e ripresa al secondo 13.
+
+## 14. Impostazioni, validazione e migrazione
+
+Tutte le chiavi di `chrome.storage.local` sono documentate in cima a `src/defaults.js`. Le impostazioni passano sempre da `kwSanitize()` (player, service worker, popup): un valore di tipo sbagliato o fuori dall'elenco (`KW_CHOICES`) torna a quello predefinito, `popups` viene completato con le categorie mancanti, `uiOpacity` è limitata a 40–100, `skipCredits` a 0–3599.
+
+All'installazione e a ogni aggiornamento (`chrome.runtime.onInstalled`) il service worker esegue `migrateSettings()`: legge tutto, scrive i valori validati e `settingsSchema` (2 dalla 1.4.0). Chi arriva dalla 1.3.0 conserva tutte le sue scelte; le chiavi nuove prendono il valore di serie. Con `reason === 'update'` salva anche `whatsNew` (versione nuova e precedente), che il menu mostra una volta in Panoramica.
+
+Le statistiche sono separate dalle impostazioni (`stats`), così azzerare l'una non tocca l'altra. Se `stats` non è leggibile viene ricostruito vuoto e la copia rovinata finisce in `statsCorrupt`.
+
+## 15. Popup sul video, profili e aspetto
+
+**Categorie** (`KW_POPUP_CATEGORIES`): `countdown`, `confirm`, `limit`, `sleep`, `recovery`, `info`. In `player.js` ogni messaggio passa da `showPanel(categoria, …)` o `showToast(categoria, …)`, che consultano `kwPopupVisible(settings, categoria)`: con `popupsHidden` o la categoria spenta il messaggio non viene mostrato, ma l'azione avviene lo stesso:
+
+- `countdown` nascosto: il cambio parte dopo lo stesso tempo con un `setTimeout` (`silentNext`); l'utente può sempre cambiare a mano.
+- `limit` nascosto: non potendo chiedere, al limite la visione si ferma (scelta sicura) e, con la scheda nascosta, arriva la notifica. Per continuare basta premere "prossimo episodio" sul player: un click manuale azzera il conteggio di fila.
+- `sleep`, `recovery`, `confirm`, `info` nascosti: timer, recupero e salvataggi avvengono senza riquadro.
+
+Le notifiche sul desktop seguono solo `notifyEnd` e non dipendono dai popup. La guida alle scorciatoie è sempre visibile perché la chiede l'utente.
+
+**Profili** (`KW_PROFILES`): ogni profilo ha un `preset` con solo le chiavi che cambia. `kwProfileChanges(id, attuali)` restituisce le modifiche da scrivere (più `profile`), applicate una volta sola al click: niente sovrascrive in seguito le scelte dell'utente. `kwProfileDiff(id, impostazioni)` elenca le chiavi diverse dal preset (anche `popups.<categoria>`): se non è vuoto il menu mostra "Personalizzato". I profili non toccano `sleep`, `stopAfter`, aspetto, scorciatoie e statistiche.
+
+**Aspetto**: `uiSize`, `uiDensity`, `uiOpacity`, `uiPosition`, `uiAutoHide`, `uiMinimal`, `uiReduceMotion` (elenco in `KW_UI_KEYS`, usato da "Ripristina aspetto"). `kwApplyUiVars()` in `panel.js` li traduce in variabili CSS sugli host Shadow DOM (`--kw-scale`, `--kw-gap`, `--kw-alpha`): l'opacità vale solo per lo sfondo, il testo resta pieno. `prefers-reduced-motion: reduce` disattiva le animazioni anche senza l'opzione.
+
+## 16. Scorciatoie e guida
+
+Comandi in `manifest.json` → `commands`: `toggle-enabled` (Alt+Shift+K), `quick-skip` (Alt+Shift+Right), `skip-intro` (Alt+Shift+S), `show-shortcuts` (Alt+Shift+H), `mark-intro`, `mark-credits`, `stop-at-end` (senza combinazione: Chrome ne accetta al massimo 4 suggerite). Le combinazioni con Alt+frecce senza Shift non sono state usate perché nel browser sono Indietro e Avanti.
+
+Flusso: `chrome.commands.onCommand` → `handleCommand()` nel service worker. `toggle-enabled` agisce subito; gli altri vengono mandati alla scheda attiva. Prima il service worker chiede a tutti i frame `kwIsEditing`: risponde `true` solo il frame che ha il focus su un campo di testo, e in quel caso il comando viene ignorato. Poi manda `kwCommand` ai frame: risponde `{ ok: true }` solo il player.
+
+Stato delle scorciatoie: `chrome.commands.getAll()` dà la combinazione effettiva (stringa vuota se non assegnata o tolta). `kwShortcutStates()` la confronta con quella suggerita (`missing` se il browser non l'ha assegnata, probabilmente per un conflitto con un'altra estensione) e con `KW_BROWSER_SHORTCUTS` (combinazioni note del browser). Un'estensione non può sapere quali combinazioni usano le altre estensioni o il sito: oltre a questo non si possono rilevare conflitti. `kwShortcutLabel()` mostra le frecce come `→`.
+
+La guida (`guide.js`) è un host Shadow DOM sul player con l'elenco, la disponibilità attuale dei comandi (calcolata da `availability()` in `player.js`) e i pulsanti Chiudi e Configura. Esc la chiude sia dal player sia dalle pagine del sito (`cinema.js` inoltra `kwEscape`). `guideAutoClose` (0, 10, 20 s) la chiude da sola.
+
+## 17. Statistiche
+
+**Misura** (`player.js`, `statsSample`): a ogni `timeupdate` e agli eventi di pausa e fine si confrontano il tempo trascorso secondo `performance.now()` (monotono, non risente dei cambi d'orologio) e l'avanzamento di `currentTime`. L'intervallo conta solo se il video stava suonando sia all'inizio sia alla fine (non in pausa, non in `seeking`, `readyState >= 3`) e se l'avanzamento è plausibile (non oltre `dt × velocità + 1,5 s`: un salto in avanti non conta). Si aggiunge `min(dt, avanzamento / velocità + 0,25)`, cioè tempo reale, non tempo del video. Intervalli oltre 20 s segnano il dato come stimato. Il tempo accumulato parte verso il service worker ogni 15 s e a pausa, fine, cambio di visibilità e `pagehide`.
+
+**Scrittura**: solo il service worker scrive `stats`, in coda (`withStats`), così player e popup non si sovrascrivono. `KWStats.addPlay` divide a mezzanotte un tratto a cavallo di due giorni e limita ogni invio a 120 s (oltre: stimato). Le **sessioni** si chiudono dopo 30 minuti senza riproduzione. **Episodio completato**: `ended` o inizio dei titoli dopo aver visto almeno metà di quello che restava dal punto di partenza (minimo 60 s); il service worker scarta lo stesso episodio (chiave FNV-1a di titolo ed episodio) entro 6 ore. **Intro e titoli** contano solo i salti automatici; "Annulla" sull'intro la toglie (`introUndo`).
+
+**Conservazione**: 400 giorni, sessioni comprese (`KWStats.prune`). Nessun titolo esce dai file esportati: nel JSON ci sono solo date, numeri e orari d'inizio delle sessioni.
+
+**Formati**: CSV con separatore `;`, BOM UTF-8 e secondi interi (colonne in `KWStats.CSV_COLUMNS`); JSON `{ schema: "keep-watching-stats", version: 1, generatedAt, extensionVersion, period, totals, days: [...], sessions: [...] }`. L'importazione (`KWStats.parseImport`) accetta solo questo JSON, controlla ogni campo e rifiuta il file intero se qualcosa non torna; "unisci" tiene per ogni giorno il massimo di ogni valore e scarta le sessioni con lo stesso inizio, quindi reimportare non raddoppia.
+
+**Limiti**: con la scheda in background il browser può rallentare `timeupdate` e il campionamento: il tempo resta corretto finché l'avanzamento è plausibile, altrimenti il tratto non viene contato. Se il browser viene chiuso di colpo si perdono al massimo gli ultimi 15 secondi.
+
+## 18. Aggiornamenti da GitHub
+
+Il menu (`popup.js` con `lib/updates.js`) interroga l'API pubblica di GitHub senza autenticazione (`credentials: 'omit'`, nessun token) sul repository `KW_LINKS.repo` (`MashaUP/Keep_Watching`, definito una volta sola in `defaults.js`):
+
+1. `GET https://api.github.com/repos/MashaUP/Keep_Watching/releases?per_page=15`. Un repository pubblico risponde sempre 200, anche senza release; 404 vuol dire repository inesistente o privato. Se ci sono release: la prima non prerelease è l'ultima stabile, lo zip è l'asset `Keep_Watching-<versione>.zip`, le note sono le voci "- …" del testo della release. Le prerelease più nuove vengono solo segnalate.
+2. Senza release: `GET …/contents/version.json` (scritto da `tools/package.*`), poi `GET …/contents/` per trovare lo zip indicato (`download_url`) e `GET …/contents/CHANGELOG.md` per note e registro delle versioni.
+
+Le versioni si confrontano secondo SemVer (`compareVersions`: prefisso `v` ignorato, prerelease più vecchia della versione finale, `1.10.0 > 1.9.0`). Il risultato si salva in `updateCheck` ed è mostrato anche senza rete. Limiti: un controllo manuale al minuto; quello automatico al massimo uno ogni 24 ore, solo all'apertura del menu e solo con `updateAutoCheck`; con `403/429` e `x-ratelimit-remaining: 0` nessuna richiesta fino a `x-ratelimit-reset` (GitHub concede 60 richieste all'ora per indirizzo IP senza accesso).
+
+**Installazione**: un'estensione caricata da cartella non può sostituire i propri file e il codice remoto non viene mai eseguito. "Scarica aggiornamento" apre l'URL dello zip in una scheda (il browser lo scarica); l'utente lo estrae sopra la cartella; "Ho estratto lo zip: ricarica l'estensione" salva `reloadRequest` con la versione attuale e chiama `chrome.runtime.reload()`. Al ritorno la Panoramica confronta la versione del manifest con quella salvata: solo se è cambiata dice "Aggiornamento installato".
+
+Messaggi d'errore gestiti: rete assente, repository non trovato o privato, limite di richieste (con l'orario), nessuna versione pubblicata, `version.json` non valido, release senza zip (si apre la pagina della release), versione installata più nuova di quella pubblicata.
+
+## 19. Test
+
+**Test automatici delle librerie** (Node.js 18 o più recente, nessuna dipendenza):
+
+```
+node tests/run.js
+```
+
+Coprono `defaults.js` (validazione, categorie, profili, scorciatoie), `lib/stats.js` (misura, sessioni, mezzanotte, completamenti, CSV, JSON, importazione) e `lib/updates.js` (confronto delle versioni, changelog, `version.json`, release e risposte di GitHub simulate: aggiornato, nuova versione, prerelease, senza zip, senza note, rete assente, limite, 404).
+
+**Test end-to-end** (Python 3, Playwright con Chromium, ffmpeg per creare i video di prova, `xvfb-run` se non c'è uno schermo):
+
+```
+tests/e2e/run_all.sh
+```
+
+`server.py` simula il sito (pagina, iframe intermedio, player su `vixcloud.co` reindirizzato a 127.0.0.1) e risponde a `/__config` per cambiare numero di episodi, blocchi dello streaming, pulsante mancante e durata del video. `kw.py` carica una copia dell'estensione con gli Shadow DOM aperti e sostituisce `api.github.com` con risposte finte. File:
+
+| Test | Cosa prova |
+|---|---|
+| `test_regression.py` | Conto alla rovescia (Annulla, Vai ora), domanda dopo N episodi, timer a tempo, fine episodio e fine stagione, interruttore e segni da scorciatoia, notifica "pulsante non trovato" |
+| `test_quick_skip.py` | Salto avanti ripetuto, in pausa, a fine video, dopo la ricreazione dei controlli, da scorciatoia, ignorato mentre si scrive |
+| `test_popups.py` | Categorie nascoste e "nascondi tutti" con le automazioni attive, limite in modo sicuro, recupero silenzioso |
+| `test_stats.py` | Tempo reale, pause, velocità 2×, sessioni, completamenti, intro e titoli, raccolta spenta, azzeramento |
+| `test_guide_ui.py` | Guida alle scorciatoie, Esc, chiusura automatica, aspetto della barra sul player |
+| `test_popup.py` | Menu: impostazioni, popup, aspetto, profili, statistiche (grafico, CSV, JSON, importazione, azzeramento), centro aggiornamenti con GitHub finto, novità, verifica dopo la ricarica, Ko-fi |
+
+**Da provare a mano** (non riproducibili sul sito di prova): il sito e il player reali, l'API vera di GitHub con il repository pubblico, `chrome.runtime.reload()` dopo l'estrazione dello zip (in Chromium avviato da Playwright l'estensione ricaricata non torna disponibile), le scorciatoie premute davvero in Brave e i conflitti con altre estensioni, la pausa con la scheda nascosta, `tools/package.ps1` su Windows.

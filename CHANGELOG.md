@@ -3,6 +3,31 @@
 Tutte le modifiche rilevanti del progetto sono elencate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e le versioni seguono il [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.4.0] - 2026-10-17
+
+### Aggiunto
+- **Nuovo menu a sezioni**: Panoramica, Riproduzione, Interfaccia sul video, Profili, Statistiche, Aggiornamenti e Sostieni, con tema scuro ispirato a StreamingCommunity. Si può aprire anche in una scheda (pulsante in basso a sinistra).
+- **Profili**: Normale, Notturno, Maratona e Manuale. Applicano un gruppo di impostazioni in un colpo; se poi ne cambi una, il menu indica "Personalizzato" e permette di ripristinare il profilo. Non toccano timer, limite di episodi, aspetto e statistiche.
+- **Popup sul video per categoria**: conto alla rovescia, conferme di intro e titoli, domanda dopo N episodi, timer di spegnimento, streaming bloccato, altri messaggi. Più l'interruttore "Nascondi tutti i popup sul video", che non spegne nessuna automazione e conserva le scelte per categoria.
+- **Salto avanti regolabile**: 15, 30, 45, 60 o 90 secondi, con scorciatoia Alt+Shift+→.
+- **Guida alle scorciatoie sul player** (Alt+Shift+H o pulsante "?"): mostra le combinazioni assegnate, quelle mancanti e i possibili conflitti; si chiude con Esc, con "Chiudi" o da sola se lo imposti.
+- **Scorciatoie** Alt+Shift+S (salta intro) e, senza combinazione predefinita, "Segna fine intro", "Segna inizio titoli", "Stop a fine episodio". Non scattano mentre stai scrivendo in un campo di testo.
+- **Aspetto della barra sul player**: dimensione, densità, opacità dello sfondo, posizione, tempo prima di nascondersi, modalità minimale, animazioni ridotte (rispetta anche l'impostazione di sistema), con anteprima nel menu e "Ripristina aspetto".
+- **Statistiche locali**: tempo di visione reale (pause e caricamenti esclusi), sessioni, durata media, episodi completati, intro e titoli saltati, per oggi, 7 o 30 giorni, con grafico giornaliero e tabella. Restano solo sul computer; si possono disattivare e azzerare.
+- **Esportazione CSV e JSON** delle statistiche e **importazione** del JSON (unisci o sostituisci, senza duplicati).
+- **Centro aggiornamenti**: pulsante "Cerca aggiornamento" che legge il repository GitHub ufficiale (release, oppure `version.json` e `CHANGELOG.md`), con versione installata e ultima pubblicata, novità, registro delle versioni, download dello zip e verifica reale dopo la ricarica. Controllo automatico facoltativo al massimo una volta al giorno. Nessuna installazione automatica.
+- **Novità dopo un aggiornamento**, mostrate una volta nel menu (mai sul video).
+- **Sezione Sostieni** con il link a Ko-fi.
+
+### Corretto
+- **Il pulsante "+60 s" spariva** dopo i primi 3 minuti (o veniva sostituito da "Salta intro"): ora resta disponibile per tutto l'episodio e si può premere più volte di seguito; vicino alla fine si ferma un secondo prima.
+- Dopo vari salti in avanti di seguito il controllo "streaming bloccato" poteva scattare per errore.
+- Il riquadro "Intro saltata" non blocca più il cambio automatico dell'episodio.
+
+### Modificato
+- Impostazioni validate a ogni lettura e migrate all'aggiornamento (schema 2): valori fuori elenco tornano a quelli predefiniti.
+- Nuove librerie `src/lib/stats.js` e `src/lib/updates.js`, con test automatici in `tests/`.
+
 ## [1.3.0] - 2026-10-09
 
 ### Aggiunto

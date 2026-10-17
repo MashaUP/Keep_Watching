@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Keep_Watching",
-  "version": "1.3.0",
-  "description": "Su StreamingCommunity passa da solo all'episodio successivo, salta intro e titoli per serie, con timer di spegnimento.",
+  "version": "1.4.0",
+  "description": "Su StreamingCommunity passa da solo all'episodio successivo, salta intro e titoli, con timer, statistiche locali e aggiornamenti.",
   "permissions": [
     "storage",
     "declarativeNetRequest",
@@ -31,6 +31,33 @@
         "default": "Alt+Shift+K"
       },
       "description": "Attiva o sospendi Keep_Watching"
+    },
+    "quick-skip": {
+      "suggested_key": {
+        "default": "Alt+Shift+Right"
+      },
+      "description": "Salto avanti (durata scelta nel menu)"
+    },
+    "skip-intro": {
+      "suggested_key": {
+        "default": "Alt+Shift+S"
+      },
+      "description": "Salta intro"
+    },
+    "show-shortcuts": {
+      "suggested_key": {
+        "default": "Alt+Shift+H"
+      },
+      "description": "Guida alle scorciatoie sul player"
+    },
+    "mark-intro": {
+      "description": "Segna la fine dell'intro"
+    },
+    "mark-credits": {
+      "description": "Segna l'inizio dei titoli"
+    },
+    "stop-at-end": {
+      "description": "Stop a fine episodio"
     }
   },
   "declarative_net_request": {
@@ -50,8 +77,10 @@
       ],
       "js": [
         "src/defaults.js",
+        "src/lib/stats.js",
         "src/panel.js",
         "src/toolbar.js",
+        "src/guide.js",
         "src/player.js"
       ],
       "all_frames": true,

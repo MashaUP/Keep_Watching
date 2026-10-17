@@ -2,14 +2,17 @@
  * Keep_Watching — service worker.
  *
  *   - badge sull'icona: "OFF" se sospesa, "2/3" durante un limite di episodi;
- *   - scorciatoia da tastiera per attivare o sospendere l'estensione;
+ *   - scorciatoie da tastiera: attiva/sospendi qui, le altre inoltrate al player
+ *     (mai mentre si scrive in un campo di testo);
  *   - notifiche sul desktop (richieste da player.js);
- *   - schermo intero della finestra tra un episodio e l'altro ("cinema").
+ *   - schermo intero della finestra tra un episodio e l'altro ("cinema");
+ *   - statistiche di visione: unico punto che le scrive, una modifica alla volta;
+ *   - migrazione delle impostazioni e novità dopo un aggiornamento.
  *
  * Il service worker può essere fermato dal browser in qualsiasi momento: lo stato
  * va sempre tenuto in chrome.storage, mai in variabili globali.
  */
-importScripts('defaults.js');
+importScripts('defaults.js', 'lib/stats.js');
 
 const BADGE_GREEN = '#19AD79';
 const BADGE_GREY = '#5A6370';
@@ -20,7 +23,8 @@ const CINEMA_SETTLE_MS = 2500;
 // ---------- Badge ----------
 
 async function updateBadge() {
-  const s = await chrome.storage.local.get({ ...KW_DEFAULTS, streak: 0, lastAutoAt: 0 });
+  const raw = await chrome.storage.local.get({ ...KW_DEFAULTS, streak: 0, lastAutoAt: 0 });
+  const s = kwSanitize(raw);
   let text = '';
   let color = BADGE_GREEN;
   let title = 'Keep_Watching: attivo';
@@ -29,9 +33,9 @@ async function updateBadge() {
     text = 'OFF';
     color = BADGE_GREY;
     title = 'Keep_Watching: sospeso';
-  } else if (s.stopAfter > 0 && s.streak > 0 && Date.now() - s.lastAutoAt < KW_STREAK_RESET_MS) {
-    text = `${s.streak}/${s.stopAfter}`;
-    title = `Keep_Watching: ${s.streak} episodi su ${s.stopAfter} prima di chiedere`;
+  } else if (s.stopAfter > 0 && raw.streak > 0 && Date.now() - raw.lastAutoAt < KW_STREAK_RESET_MS) {
+    text = `${raw.streak}/${s.stopAfter}`;
+    title = `Keep_Watching: ${raw.streak} episodi su ${s.stopAfter} prima di chiedere`;
   }
 
   await chrome.action.setBadgeText({ text });
@@ -40,13 +44,53 @@ async function updateBadge() {
   await chrome.action.setTitle({ title });
 }
 
-// ---------- Interruttore rapido ----------
+// ---------- Scorciatoie ----------
 
-chrome.commands.onCommand.addListener(async (command) => {
-  if (command !== 'toggle-enabled') return;
-  const { enabled } = await chrome.storage.local.get({ enabled: KW_DEFAULTS.enabled });
-  await chrome.storage.local.set({ enabled: !enabled });
-});
+async function shortcutStates() {
+  return kwShortcutStates(await chrome.commands.getAll());
+}
+
+/** true se in qualche frame della scheda il focus è su un campo di testo. */
+async function isEditing(tabId) {
+  try {
+    const res = await chrome.tabs.sendMessage(tabId, { type: 'kwIsEditing' });
+    return Boolean(res && res.editing);
+  } catch (e) {
+    return false; // nessuno ha risposto: non si sta scrivendo (o non è una pagina del sito)
+  }
+}
+
+async function activeTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  return tab || null;
+}
+
+/** Inoltra un comando al player della scheda. false se nessun player ha ricevuto. */
+async function sendToPlayer(tabId, command) {
+  const msg = { type: 'kwCommand', command };
+  if (command === 'show-shortcuts') msg.states = await shortcutStates();
+  try {
+    await chrome.tabs.sendMessage(tabId, msg);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Funzione con nome (globale nel service worker) anche per poterla provare nei test.
+async function handleCommand(command, tab) {
+  if (command === 'toggle-enabled') {
+    const { enabled } = await chrome.storage.local.get({ enabled: KW_DEFAULTS.enabled });
+    await chrome.storage.local.set({ enabled: !enabled });
+    return 'toggled';
+  }
+  const target = tab && tab.id != null ? tab : await activeTab();
+  if (!target || target.id == null) return;
+  if (await isEditing(target.id)) return 'editing';
+  return (await sendToPlayer(target.id, command)) ? 'sent' : 'no-player';
+}
+
+chrome.commands.onCommand.addListener((command, tab) => { handleCommand(command, tab); });
 
 // ---------- Modalità cinema ----------
 
@@ -109,26 +153,88 @@ chrome.notifications.onClicked.addListener(async (id) => {
 
 chrome.notifications.onClosed.addListener((id) => chrome.storage.session.remove(`notif:${id}`));
 
-// ---------- Messaggi dai content script ----------
+// ---------- Statistiche ----------
+// Una sola coda di scritture: player, popup e importazioni non si sovrascrivono a vicenda.
+
+let statsChain = Promise.resolve();
+
+function withStats(change, { force = false } = {}) {
+  const job = statsChain.then(async () => {
+    const { stats: raw, statsEnabled } = await chrome.storage.local.get({ stats: null, statsEnabled: true });
+    if (!force && statsEnabled === false) return { ok: false, reason: 'disattivate' };
+    const { stats, repaired } = KWStats.validateStats(raw);
+    // Dati irriconoscibili: si conserva una copia per capire cosa è successo, poi si riparte.
+    if (repaired && raw && raw.schema !== KWStats.KW_STATS_SCHEMA) {
+      await chrome.storage.local.set({ statsCorrupt: { at: Date.now(), raw: JSON.stringify(raw).slice(0, 100000) } });
+    }
+    const result = change(stats) || { ok: true };
+    KWStats.prune(result.stats || stats);
+    await chrome.storage.local.set({ stats: result.stats || stats });
+    return { ok: true, ...result, stats: undefined };
+  });
+  statsChain = job.catch((e) => console.warn('[Keep_Watching] Statistiche non salvate:', e && e.message));
+  return job;
+}
+
+async function handleStats(msg, sender) {
+  if (msg.status && sender.tab) {
+    await chrome.storage.session.set({
+      nowPlaying: { ...msg.status, tabId: sender.tab.id, at: Date.now() }
+    });
+  }
+  if (msg.play) withStats((st) => { KWStats.addPlay(st, msg.play); });
+  if (msg.event) withStats((st) => { KWStats.addEvent(st, msg.event); });
+}
+
+// ---------- Messaggi ----------
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     switch (msg && msg.type) {
       case 'notify':
         await notify(msg.title, msg.message, sender.tab);
-        break;
+        return { ok: true };
       case 'enterCinema':
         if (sender.tab) await enterCinema(sender.tab.windowId);
-        break;
+        return { ok: true };
       case 'exitCinema':
         await exitCinema();
-        break;
+        return { ok: true };
       case 'reloadEpisode':
         // Inoltrato a tutti i frame della scheda: risponde solo l'iframe intermedio (recovery.js).
         if (sender.tab) await chrome.tabs.sendMessage(sender.tab.id, { type: 'kwReloadEpisode', minute: msg.minute });
-        break;
+        return { ok: true };
+      case 'kwStats':
+        await handleStats(msg, sender);
+        return { ok: true };
+      case 'kwShortcutStates':
+        return { ok: true, states: await shortcutStates() };
+      case 'kwOpenShortcuts':
+        await chrome.tabs.create({ url: KW_LINKS.shortcuts });
+        return { ok: true };
+      case 'kwEscape':
+        if (sender.tab) await chrome.tabs.sendMessage(sender.tab.id, { type: 'kwCloseGuide' }).catch(() => {});
+        return { ok: true };
+      case 'kwShowGuide': {
+        // Dal menu: la guida compare sul player della scheda attiva, se c'è.
+        const tab = await activeTab();
+        const ok = Boolean(tab && tab.id != null && await sendToPlayer(tab.id, 'show-shortcuts'));
+        return { ok };
+      }
+      case 'kwStatsReset':
+        return withStats(() => ({ stats: KWStats.emptyStats() }), { force: true });
+      case 'kwStatsImport': {
+        const parsed = KWStats.parseImport(msg.text);
+        if (!parsed.ok) return parsed;
+        return withStats((st) => {
+          const merged = KWStats.mergeImport(st, parsed, msg.mode === 'replace' ? 'replace' : 'merge');
+          return { stats: merged.stats, added: merged.added, updated: merged.updated };
+        }, { force: true });
+      }
+      default:
+        return { ok: false, error: 'messaggio sconosciuto' };
     }
-  })().then(() => sendResponse({ ok: true }), (err) => sendResponse({ ok: false, error: String(err) }));
+  })().then((res) => sendResponse(res), (err) => sendResponse({ ok: false, error: String(err) }));
   return true; // risposta asincrona
 });
 
@@ -143,11 +249,38 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (turnedOff('enabled') || turnedOff('keepFullscreen')) exitCinema();
 });
 
+// ---------- Installazione, aggiornamento, migrazione ----------
+
+/**
+ * Porta le impostazioni salvate allo schema attuale: valori mancanti o non validi
+ * tornano a quelli di serie, quelli validi restano. Statistiche e serie non si toccano.
+ */
+async function migrateSettings() {
+  const stored = await chrome.storage.local.get(null);
+  const clean = kwSanitize(stored);
+  const changes = {};
+  for (const [k, v] of Object.entries(clean)) {
+    if (JSON.stringify(stored[k]) !== JSON.stringify(v)) changes[k] = v;
+  }
+  if (stored.settingsSchema !== KW_SETTINGS_SCHEMA) changes.settingsSchema = KW_SETTINGS_SCHEMA;
+  if (Object.keys(changes).length) await chrome.storage.local.set(changes);
+}
+
 // All'avvio del browser (o dopo un'installazione o un aggiornamento) la modalità cinema
 // non può essere attiva, e il badge va ricalcolato.
 function resetOnStart() {
   chrome.storage.local.set({ cinema: false });
   updateBadge();
 }
+
 chrome.runtime.onStartup.addListener(resetOnStart);
-chrome.runtime.onInstalled.addListener(resetOnStart);
+
+chrome.runtime.onInstalled.addListener(async (details) => {
+  await migrateSettings();
+  resetOnStart();
+  const version = chrome.runtime.getManifest().version;
+  // Novità da mostrare una volta nel menu (mai sul player durante la visione).
+  if (details.reason === 'update' && details.previousVersion && details.previousVersion !== version) {
+    await chrome.storage.local.set({ whatsNew: { version, from: details.previousVersion, at: Date.now() } });
+  }
+});
