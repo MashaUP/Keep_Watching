@@ -9,6 +9,9 @@ import asyncio, datetime, json, os, tempfile, time
 from kw import KW, check
 
 REPO = 'MashaUP/Keep_Watching'
+# Versione installata (dal manifest) e una versione "precedente" per gli scenari.
+CUR = json.load(open(os.path.join(os.path.dirname(__file__), '..', '..', 'manifest.json'), encoding='utf-8'))['version']
+OLD = '1.3.0'
 
 
 def rel(tag, body='### Aggiunto\n- Nuova funzione\n### Corretto\n- Un bug', pre=False, asset=True):
@@ -53,15 +56,15 @@ async def fresh_check(k, pg, routes):
 
 async def main():
     async with KW(quiet=True) as k:
-        k.github = {'/releases?per_page=15': (200, [rel('v1.4.0')])}
-        await k.set({'stats': seeded_stats(), 'whatsNew': {'version': '1.4.0', 'from': '1.3.0', 'at': int(time.time() * 1000)}})
+        k.github = {'/releases?per_page=15': (200, [rel('v' + CUR)])}
+        await k.set({'stats': seeded_stats(), 'whatsNew': {'version': CUR, 'from': OLD, 'at': int(time.time() * 1000)}})
         pg = await k.popup()
 
         print('Panoramica e novità')
-        check(await text(pg, '#version') == 'v1.4.0', 'versione mostrata nel menu')
-        check(await visible(pg, '#whatsNew') and '1.3.0' in await text(pg, '#whatsNewTitle'), 'novità della 1.4.0 mostrate dopo l\'aggiornamento')
+        check(await text(pg, '#version') == 'v' + CUR, 'versione mostrata nel menu')
+        check(await visible(pg, '#whatsNew') and OLD in await text(pg, '#whatsNewTitle'), 'novità della versione installata mostrate dopo l\'aggiornamento')
         items = await pg.eval_on_selector_all('#whatsNewList li', 'l => l.map(x => x.textContent)')
-        check(len(items) >= 5 and any('Profili' in i for i in items), f'novità lette dal CHANGELOG locale ({len(items)} voci)')
+        check(len(items) >= 1 and all(len(i) < 90 for i in items), f'novità lette dal CHANGELOG locale, solo i titoli ({items})')
         await pg.click('#whatsNewClose')
         await asyncio.sleep(0.3)
         check(not await visible(pg, '#whatsNew') and (await k.get('whatsNew')).get('whatsNew') is None, 'novità chiuse: non ricompaiono')
@@ -69,6 +72,13 @@ async def main():
         kofi = await pg.eval_on_selector_all('[data-kofi-link]', 'l => l.map(a => [a.href, a.target, a.rel, a.hidden])')
         check(all(a[0] == 'https://ko-fi.com/mashaup' and a[1] == '_blank' and 'noopener' in a[2] and not a[3] for a in kofi) and len(kofi) == 2,
               'link Ko-fi corretti, in nuova scheda, senza referrer (panoramica e Sostieni)')
+
+        print('Migrazione dalla 1.4.0')
+        await k.sw.evaluate("chrome.storage.local.remove('toolbar').then(() => chrome.storage.local.set({ uiMinimal: true })).then(() => migrateSettings())")
+        st = await k.get(['toolbar', 'uiMinimal', 'settingsSchema'])
+        check(st['toolbar'] == {'skipIntro': True, 'quick': True, 'setIntro': False, 'setCredits': False, 'stopAtEnd': False, 'help': False}
+              and 'uiMinimal' not in st and st['settingsSchema'] == 3, f'modalità minimale convertita nella scelta dei pulsanti: {st}')
+        await k.set({'toolbar': {'skipIntro': True, 'quick': True, 'setIntro': True, 'setCredits': True, 'stopAtEnd': True, 'help': True}})
 
         print('Impostazioni')
         await pg.click('.nav button[data-section="playback"]')
@@ -104,16 +114,31 @@ async def main():
         await pg.click('.seg[data-setting="uiSize"] button[data-value="large"]')
         await pg.click('.seg[data-setting="uiPosition"] button[data-value="top-left"]')
         await pg.evaluate("(() => { const r = document.getElementById('uiOpacity'); r.value = 55; r.dispatchEvent(new Event('input')); r.dispatchEvent(new Event('change')); })()")
-        await pg.click('input[data-setting="uiMinimal"]', force=True)
+        await pg.click('input[data-toolbar="help"]', force=True)
+        await pg.click('input[data-toolbar="stopAtEnd"]', force=True)
         await asyncio.sleep(0.3)
-        st = await k.get(['uiSize', 'uiPosition', 'uiOpacity', 'uiMinimal'])
-        check(st == {'uiSize': 'large', 'uiPosition': 'top-left', 'uiOpacity': 55, 'uiMinimal': True}, f'aspetto salvato: {st}')
-        pv = await pg.evaluate("(() => { const b = document.getElementById('pvBar'); return [b.style.getPropertyValue('--pv-scale'), b.style.getPropertyValue('--pv-alpha'), b.classList.contains('left'), [...b.querySelectorAll('.pv-btn')].map(x => x.hidden ? '-' : x.textContent)] })()")
-        check(pv[0] == '1.2' and pv[1] == '0.55' and pv[2] and pv[3][0] == '+30 s' and all(x == '-' for x in pv[3][1:]), f'anteprima aggiornata: {pv}')
+        st = await k.get(['uiSize', 'uiPosition', 'uiOpacity', 'toolbar'])
+        check(st['toolbar'] == {'skipIntro': True, 'quick': True, 'setIntro': True, 'setCredits': True, 'stopAtEnd': False, 'help': False}, f'pulsanti scelti uno per uno: {st["toolbar"]}')
+        check({k2: st[k2] for k2 in ('uiSize', 'uiPosition', 'uiOpacity')} == {'uiSize': 'large', 'uiPosition': 'top-left', 'uiOpacity': 55}, f'aspetto salvato: {st}')
+        check(await text(pg, '[data-toolbar-label="quick"]') == 'Salto avanti (+30 s)', 'etichetta del salto con la durata scelta')
+        await pg.click('#toolbarMinimal')
+        await asyncio.sleep(0.3)
+        tb = (await k.get('toolbar'))['toolbar']
+        check({i for i, v in tb.items() if v} == {'skipIntro', 'quick'}, f'"Solo Salta intro e salto avanti": {tb}')
+        await pg.evaluate("document.querySelectorAll('input[data-toolbar]').forEach(i => { if (i.checked) i.click(); })")
+        await asyncio.sleep(0.4)
+        check(await visible(pg, '#pvEmpty') and not await visible(pg, '#pvBar'), 'nessun pulsante: l\'anteprima lo dice')
+        await pg.click('#toolbarAll')
+        await asyncio.sleep(0.3)
+        check(all((await k.get('toolbar'))['toolbar'].values()), '"Tutti" rimette ogni pulsante')
+        await pg.click('#toolbarMinimal')
+        await asyncio.sleep(0.3)
+        pv = await pg.evaluate("(() => { const b = document.getElementById('pvBar'); return [b.style.getPropertyValue('--pv-scale'), b.style.getPropertyValue('--pv-alpha'), document.getElementById('pvVideo').classList.contains('left'), [...b.querySelectorAll('.pv-btn')].map(x => x.hidden ? '-' : x.textContent)] })()")
+        check(pv[0] == '1.2' and pv[1] == '0.55' and pv[2] and pv[3] == ['Salta intro', '+30 s', '-', '-', '-', '-'], f'anteprima aggiornata: {pv}')
         await pg.click('#resetLook')
         await asyncio.sleep(0.3)
-        st = await k.get(['uiSize', 'uiPosition', 'uiOpacity', 'uiMinimal', 'quickSkip', 'countdown', 'popups'])
-        check(st['uiSize'] == 'standard' and st['uiPosition'] == 'top-right' and st['uiOpacity'] == 82 and not st['uiMinimal']
+        st = await k.get(['uiSize', 'uiPosition', 'uiOpacity', 'toolbar', 'quickSkip', 'countdown', 'popups'])
+        check(st['uiSize'] == 'standard' and st['uiPosition'] == 'top-right' and st['uiOpacity'] == 82 and all(st['toolbar'].values())
               and st['quickSkip'] == 30 and st['countdown'] == 15 and st['popups']['info'] is False,
               'Ripristina aspetto: solo l\'aspetto, non salto, conto alla rovescia e popup')
         await k.set({'countdown': 10, 'popups': {**st['popups'], 'info': True}})
@@ -176,7 +201,7 @@ async def main():
             await pg.click('#exportJson')
         dl = await d.value
         exported = json.load(open(await dl.path(), encoding='utf-8'))
-        check(exported['schema'] == 'keep-watching-stats' and exported['extensionVersion'] == '1.4.0' and len(exported['days']) == 10, 'JSON con formato, versione e 10 giorni')
+        check(exported['schema'] == 'keep-watching-stats' and exported['extensionVersion'] == CUR and len(exported['days']) == 10, 'JSON con formato, versione e 10 giorni')
         check(not any('title' in json.dumps(x).lower() for x in exported['days']), 'nessun titolo nel file esportato')
 
         # Importazione (in scheda: dal popup il selettore di file lo chiuderebbe).
@@ -225,11 +250,11 @@ async def main():
         check((await k.get('quickSkip'))['quickSkip'] == 30, 'azzerare le statistiche non tocca le impostazioni')
 
         print('Aggiornamenti (GitHub finto)')
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v1.4.0'), rel('v1.3.0')])})
-        check('Sei aggiornato' in st and await pg.is_disabled('#updateAction') and await text(pg, '#uLatest') == '1.4.0', 'stessa versione: "Sei aggiornato"')
+        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v' + CUR), rel('v' + OLD)])})
+        check('Sei aggiornato' in st and await pg.is_disabled('#updateAction') and await text(pg, '#uLatest') == CUR, 'stessa versione: "Sei aggiornato"')
         check(len(await pg.eval_on_selector_all('#historyList .history-item', 'l => l')) == 2, 'registro delle versioni dalle release')
 
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v1.6.0-beta.1', pre=True), rel('v1.5.0'), rel('v1.4.0')])})
+        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v1.6.0-beta.1', pre=True), rel('v1.5.0'), rel('v' + CUR)])})
         check('1.5.0' in st and await text(pg, '#updateAction') == 'Scarica aggiornamento', 'versione più recente: "Scarica aggiornamento"')
         check(await visible(pg, '#uPrerelease') and '1.6.0-beta.1' in await text(pg, '#uPrerelease'), 'versione di prova segnalata ma non proposta')
         check(await visible(pg, '#navUpdateDot') is False, 'aperta la sezione: indicatore sul menu spento')
@@ -247,16 +272,16 @@ async def main():
         st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v1.5.0', body='', asset=False)])})
         check(await text(pg, '#updateAction') == 'Apri la pagina su GitHub' and 'non ha note' in await text(pg, '#uNotes'), 'release senza zip né note: pagina della release')
 
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v1.3.0')])})
+        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v' + OLD)])})
         check('più recente' in st, f'versione installata più nuova di quella pubblicata: {st}')
 
-        changelog = open(os.path.join(os.path.dirname(__file__), '..', '..', 'CHANGELOG.md'), encoding='utf-8').read().replace('## [1.4.0]', '## [1.4.1] - 2026-10-30\n\n### Corretto\n- Prova\n\n## [1.4.0]')
+        changelog = open(os.path.join(os.path.dirname(__file__), '..', '..', 'CHANGELOG.md'), encoding='utf-8').read().replace(f'## [{CUR}]', f'## [9.9.1] - 2026-10-30\n\n### Corretto\n- Prova\n\n## [{CUR}]')
         st = await fresh_check(k, pg, {
             '/releases?per_page=15': (200, []),
-            'contents/version.json': (200, {'version': '1.4.1', 'date': '2026-10-30', 'zip': 'Keep_Watching-1.4.1.zip'}),
+            'contents/version.json': (200, {'version': '9.9.1', 'date': '2026-10-30', 'zip': 'Keep_Watching-9.9.1.zip'}),
             'contents/CHANGELOG.md': (200, changelog),
-            'contents/': (200, [{'type': 'file', 'name': 'Keep_Watching-1.4.1.zip', 'size': 1, 'download_url': f'https://raw.githubusercontent.com/{REPO}/main/Keep_Watching-1.4.1.zip'}])})
-        check('1.4.1' in st and await text(pg, '#updateAction') == 'Scarica aggiornamento' and 'version.json' in await text(pg, '#uSource'), 'senza release: version.json e zip nel repository')
+            'contents/': (200, [{'type': 'file', 'name': 'Keep_Watching-9.9.1.zip', 'size': 1, 'download_url': f'https://raw.githubusercontent.com/{REPO}/main/Keep_Watching-9.9.1.zip'}])})
+        check('9.9.1' in st and await text(pg, '#updateAction') == 'Scarica aggiornamento' and 'version.json' in await text(pg, '#uSource'), 'senza release: version.json e zip nel repository')
         check('Prova' in await text(pg, '#uNotes'), 'note prese dal CHANGELOG del repository')
 
         st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [])})
@@ -273,7 +298,7 @@ async def main():
         await asyncio.sleep(0.3)
         check(len(k.github_calls) == calls and 'di nuovo richieste dalle' in await text(pg, '#uStatus'), 'durante il blocco nessuna nuova richiesta, con l\'orario')
 
-        k.github = {'/releases?per_page=15': (200, [rel('v1.4.0')])}
+        k.github = {'/releases?per_page=15': (200, [rel('v' + CUR)])}
         await k.set({'updateCheck': {**(await k.get('updateCheck'))['updateCheck'], 'rateLimitReset': None, 'at': int(time.time() * 1000) - 120000}})
         await asyncio.sleep(0.2)
         await pg.click('#checkUpdate')
@@ -292,13 +317,13 @@ async def main():
         check(len(k.github_calls) == calls, 'controllo automatico disattivato: nessuna richiesta')
 
         print('Verifica dopo la ricarica')
-        await k.set({'reloadRequest': {'from': '1.3.0', 'at': int(time.time() * 1000)}})
+        await k.set({'reloadRequest': {'from': OLD, 'at': int(time.time() * 1000)}})
         await pg.click('.nav button[data-section="overview"]')
         await asyncio.sleep(0.3)
-        check('ora hai la 1.4.0' in await text(pg, '#installTitle'), 'versione cambiata: installazione confermata')
-        await k.set({'reloadRequest': {'from': '1.4.0', 'at': int(time.time() * 1000)}})
+        check(f'ora hai la {CUR}' in await text(pg, '#installTitle'), 'versione cambiata: installazione confermata')
+        await k.set({'reloadRequest': {'from': CUR, 'at': int(time.time() * 1000)}})
         await asyncio.sleep(0.3)
-        check('ancora la 1.4.0' in await text(pg, '#installTitle'), 'stessa versione: non dichiara installato, spiega cosa fare')
+        check(f'ancora la {CUR}' in await text(pg, '#installTitle'), 'stessa versione: non dichiara installato, spiega cosa fare')
         await pg.click('#installClose')
         await asyncio.sleep(0.3)
         check(not await visible(pg, '#installBanner'), 'avviso chiuso')

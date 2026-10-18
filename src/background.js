@@ -264,6 +264,8 @@ async function migrateSettings() {
   }
   if (stored.settingsSchema !== KW_SETTINGS_SCHEMA) changes.settingsSchema = KW_SETTINGS_SCHEMA;
   if (Object.keys(changes).length) await chrome.storage.local.set(changes);
+  // Chiavi non più usate: uiMinimal (fino alla 1.4.0) è ora dentro toolbar.
+  if ('uiMinimal' in stored) await chrome.storage.local.remove('uiMinimal');
 }
 
 // All'avvio del browser (o dopo un'installazione o un aggiornamento) la modalità cinema

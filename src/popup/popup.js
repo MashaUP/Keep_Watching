@@ -129,7 +129,7 @@
     if (!list.childElementCount) {
       for (const c of KW_POPUP_CATEGORIES) {
         const input = h('input', { type: 'checkbox', class: 'switch', 'data-popup': c.id });
-        input.addEventListener('change', () => set({ popups: { ...S.popups, [c.id]: input.checked } }));
+        input.addEventListener('change', () => { S.popups = { ...S.popups, [c.id]: input.checked }; set({ popups: S.popups }); });
         list.append(h('label', { class: 'row' },
           h('span', { class: 'row-text' }, h('span', { class: 'row-title', text: c.label }), h('span', { class: 'row-hint', text: c.hint })),
           input));
@@ -142,6 +142,28 @@
     }
   }
 
+  // ---------- Pulsanti della barra ----------
+
+  function renderToolbarChoice() {
+    const list = $('toolbarList');
+    if (!list.childElementCount) {
+      for (const b of KW_TOOLBAR_BUTTONS) {
+        const input = h('input', { type: 'checkbox', class: 'switch', 'data-toolbar': b.id, 'aria-label': b.label });
+        // S si aggiorna subito: più clic rapidi non si sovrascrivono a vicenda.
+        input.addEventListener('change', () => { S.toolbar = { ...S.toolbar, [b.id]: input.checked }; set({ toolbar: S.toolbar }); renderPreview(); });
+        list.append(h('label', { class: 'row' },
+          h('span', { class: 'row-text' }, h('span', { class: 'row-title', 'data-toolbar-label': b.id, text: b.label }), h('span', { class: 'row-hint', text: b.hint })),
+          input));
+      }
+    }
+    for (const input of $$('input[data-toolbar]', list)) input.checked = S.toolbar[input.dataset.toolbar] !== false;
+    $('toolbarList').querySelector('[data-toolbar-label="quick"]').textContent = `Salto avanti (+${S.quickSkip} s)`;
+  }
+
+  const toolbarPreset = (on) => Object.fromEntries(KW_TOOLBAR_BUTTONS.map((b) => [b.id, on(b.id)]));
+  $('toolbarAll').addEventListener('click', () => set({ toolbar: toolbarPreset(() => true) }));
+  $('toolbarMinimal').addEventListener('click', () => set({ toolbar: toolbarPreset((id) => id === 'skipIntro' || id === 'quick') }));
+
   // ---------- Anteprima della barra ----------
 
   function renderPreview(s = S) {
@@ -149,11 +171,16 @@
     bar.style.setProperty('--pv-scale', String({ compact: 0.86, standard: 1, large: 1.2 }[s.uiSize] || 1));
     bar.style.setProperty('--pv-gap', `${{ dense: 4, standard: 8, spaced: 12 }[s.uiDensity] || 8}px`);
     bar.style.setProperty('--pv-alpha', String(s.uiOpacity / 100));
-    bar.classList.toggle('left', s.uiPosition === 'top-left');
-    bar.classList.toggle('center', s.uiPosition === 'top-center');
-    const btns = $$('.pv-btn', bar);
-    btns[0].textContent = `+${s.quickSkip} s`;
-    for (const b of btns.slice(1)) b.hidden = s.uiMinimal;
+    $('pvVideo').classList.toggle('left', s.uiPosition === 'top-left');
+    $('pvVideo').classList.toggle('center', s.uiPosition === 'top-center');
+    let shown = 0;
+    for (const b of $$('.pv-btn', bar)) {
+      b.hidden = s.toolbar[b.dataset.pv] === false;
+      if (!b.hidden) shown += 1;
+      if (b.dataset.pv === 'quick') b.textContent = `+${s.quickSkip} s`;
+    }
+    bar.hidden = shown === 0;
+    $('pvEmpty').hidden = shown > 0;
   }
 
   $('resetLook').addEventListener('click', () => {
@@ -812,6 +839,7 @@
   function render() {
     renderSettings();
     renderPopups();
+    renderToolbarChoice();
     renderPreview();
     renderSleep();
     renderSkip();

@@ -11,7 +11,7 @@
  *     enabled, autoNext, autoPlay, keepFullscreen, notifyEnd, introSkip, pauseOnHidden,
  *     watchdog, sleepFade, countdown, skipCredits, stopAfter, quickSkip,
  *     popupsHidden, popups{…}, profile,
- *     uiSize, uiDensity, uiOpacity, uiPosition, uiAutoHide, uiMinimal, uiReduceMotion,
+ *     uiSize, uiDensity, uiOpacity, uiPosition, uiAutoHide, toolbar{…}, uiReduceMotion,
  *     guideAutoClose, statsEnabled, updateAutoCheck, showWhatsNew
  *   Dati per serie:
  *     series          { "<titolo>": { introEnd, creditsStart } } — introEnd: secondo di fine
@@ -35,7 +35,8 @@
  *     nowPlaying      { title, name, playing, at } — ultimo stato riferito dal player
  */
 
-const KW_SETTINGS_SCHEMA = 2;
+// 3 (1.4.1): uiMinimal sostituita dalla scelta dei singoli pulsanti della barra (toolbar).
+const KW_SETTINGS_SCHEMA = 3;
 
 // Collegamenti ufficiali del progetto: cambiare solo qui.
 const KW_LINKS = {
@@ -63,6 +64,20 @@ const KW_POPUP_CATEGORIES = [
 
 const KW_POPUPS_ALL_ON = Object.fromEntries(KW_POPUP_CATEGORIES.map((c) => [c.id, true]));
 
+// Pulsanti della barra sul player: ognuno si può togliere dal menu. Gli id sono quelli
+// usati da player.js; nascondere un pulsante non disattiva la scorciatoia corrispondente.
+const KW_TOOLBAR_BUTTONS = [
+  { id: 'skipIntro', label: 'Salta intro', hint: 'Compare prima della fine dell\'intro, nelle serie in cui l\'hai segnata.' },
+  { id: 'quick', label: 'Salto avanti (+60 s)', hint: 'Avanti della durata scelta in Riproduzione.' },
+  { id: 'setIntro', label: 'Fine intro qui', hint: 'Compare nei primi 10 minuti, per segnare l\'intro della serie.' },
+  { id: 'setCredits', label: 'Inizio titoli qui', hint: 'Compare negli ultimi 10 minuti, per segnare i titoli della serie.' },
+  { id: 'stopAtEnd', label: 'Stop a fine episodio', hint: 'Attiva o disattiva il timer di fine episodio.' },
+  { id: 'help', label: '? (guida alle scorciatoie)', hint: 'La guida resta disponibile con Alt+Shift+H.' }
+];
+const KW_TOOLBAR_ALL_ON = Object.fromEntries(KW_TOOLBAR_BUTTONS.map((b) => [b.id, true]));
+// Equivalente della vecchia "modalità minimale" (fino alla 1.4.0): solo Salta intro e salto avanti.
+const KW_TOOLBAR_MINIMAL = { ...KW_TOOLBAR_ALL_ON, setIntro: false, setCredits: false, stopAtEnd: false, help: false };
+
 const KW_DEFAULTS = {
   enabled: true,
   autoNext: true,
@@ -85,7 +100,7 @@ const KW_DEFAULTS = {
   uiOpacity: 82,
   uiPosition: 'top-right',
   uiAutoHide: 3,
-  uiMinimal: false,
+  toolbar: { ...KW_TOOLBAR_ALL_ON },
   uiReduceMotion: false,
   guideAutoClose: 0,
   statsEnabled: true,
@@ -109,7 +124,7 @@ const KW_OPACITY_RANGE = [40, 100];
 const KW_SKIP_CREDITS_MAX = 59 * 60 + 59;
 
 // Impostazioni puramente estetiche: "Ripristina aspetto" tocca solo queste.
-const KW_UI_KEYS = ['uiSize', 'uiDensity', 'uiOpacity', 'uiPosition', 'uiAutoHide', 'uiMinimal', 'uiReduceMotion'];
+const KW_UI_KEYS = ['uiSize', 'uiDensity', 'uiOpacity', 'uiPosition', 'uiAutoHide', 'toolbar', 'uiReduceMotion'];
 
 /**
  * Riporta un oggetto letto dallo storage a valori validi: chiavi mancanti, tipi
@@ -124,6 +139,11 @@ function kwSanitize(raw) {
     else if (key === 'popups') {
       const p = v && typeof v === 'object' ? v : {};
       out.popups = Object.fromEntries(KW_POPUP_CATEGORIES.map((c) => [c.id, typeof p[c.id] === 'boolean' ? p[c.id] : true]));
+    } else if (key === 'toolbar') {
+      // Chi aveva la modalità minimale (1.4.0) ritrova gli stessi pulsanti.
+      const base = !(v && typeof v === 'object') && src.uiMinimal === true ? KW_TOOLBAR_MINIMAL : KW_TOOLBAR_ALL_ON;
+      const t = v && typeof v === 'object' ? v : {};
+      out.toolbar = Object.fromEntries(KW_TOOLBAR_BUTTONS.map((b) => [b.id, typeof t[b.id] === 'boolean' ? t[b.id] : base[b.id]]));
     } else if (KW_CHOICES[key]) out[key] = KW_CHOICES[key].includes(v) ? v : def;
     else if (key === 'uiOpacity') {
       const n = Math.round(Number(v));
@@ -305,7 +325,7 @@ function kwFormatDuration(seconds) {
 
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    KW_SETTINGS_SCHEMA, KW_LINKS, KW_POPUP_CATEGORIES, KW_DEFAULTS, KW_CHOICES, KW_UI_KEYS, KW_OPACITY_RANGE,
+    KW_SETTINGS_SCHEMA, KW_LINKS, KW_POPUP_CATEGORIES, KW_TOOLBAR_BUTTONS, KW_DEFAULTS, KW_CHOICES, KW_UI_KEYS, KW_OPACITY_RANGE,
     KW_PROFILES, KW_COMMANDS, KW_BROWSER_SHORTCUTS, KW_STREAK_RESET_MS, KW_SLEEP_MAX_AGE_MS,
     kwSanitize, kwPopupVisible, kwProfileChanges, kwProfileDiff, kwNormalizeShortcut, kwShortcutStates, kwShortcutLabel,
     kwActiveSleep, kwFormatTime, kwFormatDuration

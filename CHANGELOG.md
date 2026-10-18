@@ -3,6 +3,15 @@
 Tutte le modifiche rilevanti del progetto sono elencate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e le versioni seguono il [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.4.1] - 2026-10-18
+
+### Aggiunto
+- **Pulsanti sulla barra a scelta**: in Interfaccia sul video › Barra dei controlli ogni pulsante (Salta intro, salto avanti, Fine intro qui, Inizio titoli qui, Stop a fine episodio, "?") si può togliere singolarmente, con l'anteprima e le scelte rapide "Solo Salta intro e salto avanti" e "Tutti". Se non ne scegli nessuno la barra non compare. Le scorciatoie da tastiera funzionano anche con il pulsante nascosto.
+
+### Modificato
+- La "Modalità minimale" è sostituita dalla scelta dei pulsanti: chi l'aveva attiva ritrova gli stessi pulsanti (Salta intro e salto avanti). "Ripristina aspetto" rimette anche tutti i pulsanti.
+- Impostazioni migrate allo schema 3.
+
 ## [1.4.0] - 2026-10-17
 
 ### Aggiunto

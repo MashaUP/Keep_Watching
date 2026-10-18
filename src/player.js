@@ -582,35 +582,35 @@
     if (!known || left > 1.5) {
       buttons.push({ id: 'quick', label: `+${settings.quickSkip} s`, title: `Avanti di ${settings.quickSkip} secondi`, onClick: quickSkip });
     }
-    if (!settings.uiMinimal) {
-      if (EPISODE.title && t < INTRO_WINDOW_S) {
-        buttons.push({ id: 'setIntro', label: 'Fine intro qui', onClick: () => {
-          const ok = markIntro();
-          flashLabel('setIntro', ok || 'Troppo presto');
-        } });
-      }
-      if (EPISODE.title && known && left < CREDITS_WINDOW_S && left > 5) {
-        buttons.push({ id: 'setCredits', label: 'Inizio titoli qui', onClick: () => {
-          const ok = markCredits();
-          flashLabel('setCredits', ok || 'Troppo presto');
-        } });
-      }
-      const active = kwActiveSleep(sleep);
-      const stopAtEnd = !!active && active.mode === 'episode';
-      buttons.push({
-        id: 'sleepEpisode',
-        label: stopAtEnd ? 'Stop a fine episodio ✓' : 'Stop a fine episodio',
-        active: stopAtEnd,
-        onClick: toggleStopAtEnd
-      });
-      buttons.push({ id: 'help', label: '?', title: 'Scorciatoie da tastiera', extraClass: 'help', onClick: openGuide });
+    if (EPISODE.title && t < INTRO_WINDOW_S) {
+      buttons.push({ id: 'setIntro', label: 'Fine intro qui', onClick: () => {
+        const ok = markIntro();
+        flashLabel('setIntro', ok || 'Troppo presto');
+      } });
     }
+    if (EPISODE.title && known && left < CREDITS_WINDOW_S && left > 5) {
+      buttons.push({ id: 'setCredits', label: 'Inizio titoli qui', onClick: () => {
+        const ok = markCredits();
+        flashLabel('setCredits', ok || 'Troppo presto');
+      } });
+    }
+    const active = kwActiveSleep(sleep);
+    const stopAtEnd = !!active && active.mode === 'episode';
+    buttons.push({
+      id: 'stopAtEnd',
+      label: stopAtEnd ? 'Stop a fine episodio ✓' : 'Stop a fine episodio',
+      active: stopAtEnd,
+      onClick: toggleStopAtEnd
+    });
+    buttons.push({ id: 'help', label: '?', title: 'Scorciatoie da tastiera', extraClass: 'help', onClick: openGuide });
 
     if (flash && flash.until > Date.now()) {
       const b = buttons.find((x) => x.id === flash.id);
       if (b) b.label = flash.label;
     }
-    return buttons;
+    // Solo i pulsanti scelti nel menu (Interfaccia sul video › Pulsanti sulla barra).
+    // Se non ne resta nessuno la barra non compare; le scorciatoie funzionano comunque.
+    return buttons.filter((b) => settings.toolbar[b.id] !== false);
   }
 
   function refreshToolbar() {

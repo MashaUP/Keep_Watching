@@ -231,8 +231,14 @@
         <div class="card">
           <div class="card-head"><h2>Barra dei controlli</h2><button type="button" class="link" id="resetLook">Ripristina aspetto</button></div>
           <div class="preview" id="preview" aria-hidden="true">
-            <div class="preview-video"><div class="pv-bar" id="pvBar"><span class="pv-btn">+60 s</span><span class="pv-btn">Fine intro qui</span><span class="pv-btn">Stop a fine episodio</span><span class="pv-btn">?</span></div></div>
+            <div class="preview-video" id="pvVideo"><div class="pv-bar" id="pvBar"><span class="pv-btn primary" data-pv="skipIntro">Salta intro</span><span class="pv-btn" data-pv="quick">+60 s</span><span class="pv-btn" data-pv="setIntro">Fine intro qui</span><span class="pv-btn" data-pv="setCredits">Inizio titoli qui</span><span class="pv-btn" data-pv="stopAtEnd">Stop a fine episodio</span><span class="pv-btn" data-pv="help">?</span></div><span class="pv-empty" id="pvEmpty" hidden>Nessun pulsante scelto: la barra non compare</span></div>
           </div>
+          <p class="hint">Anteprima con tutti i pulsanti scelti; sul player ognuno compare solo quando serve.</p>
+          <div class="sub-head">Pulsanti sulla barra</div>
+          <p class="hint">Scegli quali pulsanti compaiono sul player. Le scorciatoie da tastiera funzionano anche con il pulsante nascosto.</p>
+          <div id="toolbarList" class="popup-list"></div>
+          <div class="toolbar-quick"><button type="button" class="btn small" id="toolbarMinimal">Solo Salta intro e salto avanti</button><button type="button" class="btn small" id="toolbarAll">Tutti</button></div>
+          <div class="sub-head">Aspetto</div>
           <div class="field"><span class="field-label">Dimensione</span>
             <div class="seg" data-setting="uiSize" role="radiogroup" aria-label="Dimensione">
               <button type="button" data-value="compact">Compatta</button><button type="button" data-value="standard">Standard</button><button type="button" data-value="large">Grande</button>
@@ -254,7 +260,6 @@
               <option value="10">Dopo 10 secondi</option>
               <option value="0">Mai: resta sempre visibile</option>
             </select></div>
-          <label class="row"><span class="row-text"><span class="row-title">Modalità minimale</span><span class="row-hint">Solo "Salta intro" e il salto avanti</span></span><input type="checkbox" class="switch" data-setting="uiMinimal"></label>
           <label class="row"><span class="row-text"><span class="row-title">Riduci le animazioni</span><span class="row-hint">Anche senza questa opzione si rispetta l'impostazione di sistema</span></span><input type="checkbox" class="switch" data-setting="uiReduceMotion"></label>
           <div class="field"><label class="field-label" for="guideAutoClose">Guida alle scorciatoie</label>
             <select id="guideAutoClose" data-setting="guideAutoClose" data-type="number">

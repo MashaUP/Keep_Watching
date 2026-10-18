@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Keep_Watching",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Su StreamingCommunity passa da solo all'episodio successivo, salta intro e titoli, con timer, statistiche locali e aggiornamenti.",
   "permissions": [
     "storage",

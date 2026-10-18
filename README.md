@@ -2,7 +2,7 @@
 
 Estensione per Brave e Chrome che su StreamingCommunity passa da sola all'episodio successivo quando quello corrente finisce, e lo fa partire con l'audio. Salta l'intro e i titoli di coda serie per serie, ha un timer di spegnimento, fa ripartire lo streaming quando si blocca e tiene statistiche di visione solo sul tuo computer.
 
-Versione 1.4.0
+Versione 1.4.1
 
 > **Importante:** il browser lascia partire l'audio da solo solo dopo un tuo click sulla pagina. Apri l'episodio e premi play una volta: da lì in poi fa tutto l'estensione.
 
@@ -18,7 +18,7 @@ Versione 1.4.0
 - **Chiedi se continuare dopo N episodi:** dopo 1, 2, 3, 5 o 10 episodi di fila il player chiede **Continua** o **Basta così**. Utile se ti addormenti.
 - **Profili:** Normale, Notturno, Maratona e Manuale cambiano un gruppo di impostazioni in un colpo.
 - **Popup sul video a scelta:** puoi nascondere i messaggi sul player per categoria, o tutti insieme, senza spegnere le automazioni.
-- **Barra sul player personalizzabile:** dimensione, densità, opacità, posizione, tempo prima che sparisca, modalità minimale, animazioni ridotte.
+- **Barra sul player personalizzabile:** scegli tu quali pulsanti compaiono, poi dimensione, densità, opacità, posizione, tempo prima che sparisca, animazioni ridotte.
 - **Scorciatoie da tastiera** con una guida sul player (**Alt+Shift+H**) che mostra quali sono attive e quali mancano.
 - **Statistiche locali:** tempo di visione, sessioni, episodi completati, intro e titoli saltati, con grafico ed esportazione in CSV o JSON.
 - **Cerca aggiornamento:** il menu controlla sul repository GitHub ufficiale se c'è una versione nuova, mostra le novità e scarica lo zip.
@@ -40,7 +40,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 ## 1. Carica il progetto su GitHub
 
 1. Crea un nuovo repository, per esempio `Keep_Watching`. Deve essere **pubblico** perché **Cerca aggiornamento** funzioni: GitHub risponde senza accesso solo per i repository pubblici. Se lo vuoi privato l'estensione funziona lo stesso, ma il controllo degli aggiornamenti dirà "Repository non trovato o privato".
-2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.4.0.zip` e le cartelle devono stare al primo livello.
+2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.4.1.zip` e le cartelle devono stare al primo livello.
 
 `version.json` e lo zip nella radice sono quello che legge **Cerca aggiornamento**. Se un giorno pubblichi le versioni come **release** di GitHub (con lo zip allegato), l'estensione usa quelle.
 
@@ -48,7 +48,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 
 ### 2.1 Estrai lo zip
 
-1. Scarica `Keep_Watching-1.4.0.zip` (dal repository, oppure dalla cartella del progetto).
+1. Scarica `Keep_Watching-1.4.1.zip` (dal repository, oppure dalla cartella del progetto).
 2. Estrailo con **Estrai qui**: ottieni la cartella `Keep_Watching`, con dentro `manifest.json`.
 3. Mettila in un posto dove resta: il browser carica l'estensione da lì ogni volta. Se la cancelli, l'estensione smette di funzionare.
 
@@ -73,7 +73,7 @@ Durante l'installazione il browser avvisa che l'estensione può **leggere e modi
 | Pagine `*/watch/*` e `*/iframe/*` | Dare al player il permesso di autoplay, schermo intero tra episodi, ricarica dello streaming bloccato |
 | Player `vixcloud.co/embed/*` | Controllare il player |
 
-La versione 1.4.0 non aggiunge permessi: il controllo degli aggiornamenti usa l'API pubblica di GitHub, che risponde a qualsiasi pagina, e l'esportazione delle statistiche usa il normale download del browser.
+Le versioni 1.4 non aggiungono permessi: il controllo degli aggiornamenti usa l'API pubblica di GitHub, che risponde a qualsiasi pagina, e l'esportazione delle statistiche usa il normale download del browser.
 
 ### 2.4 Scorciatoie
 
@@ -185,7 +185,7 @@ In **Interfaccia sul video › Popup sul video** scegli quali messaggi vedere su
 
 ### La barra sul player
 
-Muovendo il mouse sul video compare in alto una barra di pulsanti. Sparisce dopo qualche secondo senza movimento (3 di serie) e resta finché il mouse è sopra.
+Muovendo il mouse sul video compare in alto una barra di pulsanti. Sparisce dopo qualche secondo senza movimento (3 di serie) e resta finché il mouse è sopra. Di serie ci sono tutti i pulsanti qui sotto, ognuno solo quando serve; quali far comparire lo decidi tu (vedi sotto).
 
 | Pulsante | Quando compare | Cosa fa |
 |---|---|---|
@@ -196,7 +196,12 @@ Muovendo il mouse sul video compare in alto una barra di pulsanti. Sparisce dopo
 | **Stop a fine episodio** | Sempre | Attiva o disattiva il timer "fine episodio" (con ✓ quando è attivo) |
 | **?** | Sempre | Apre la guida alle scorciatoie |
 
-In **Interfaccia sul video › Barra dei controlli** puoi cambiare dimensione (compatta, standard, grande), densità, opacità dello sfondo (il testo resta leggibile), posizione (in alto a sinistra, al centro, a destra), dopo quanto si nasconde (o mai), la **modalità minimale** con solo **Salta intro** e il salto avanti, e **Riduci le animazioni** (rispettata anche l'impostazione di sistema). L'anteprima mostra il risultato; **Ripristina aspetto** riporta solo questi valori a quelli di serie.
+In **Interfaccia sul video › Barra dei controlli**:
+
+- **Pulsanti sulla barra:** un interruttore per ognuno dei sei pulsanti. Spegnendolo il pulsante non compare più sul player; la scorciatoia da tastiera corrispondente continua a funzionare (la guida, per esempio, resta su Alt+Shift+H). **Solo Salta intro e salto avanti** e **Tutti** sono scelte rapide. Se li spegni tutti, la barra non compare.
+- **Aspetto:** dimensione (compatta, standard, grande), densità, opacità dello sfondo (il testo resta leggibile), posizione (in alto a sinistra, al centro, a destra), dopo quanto si nasconde (o mai) e **Riduci le animazioni** (rispettata anche l'impostazione di sistema).
+
+L'anteprima mostra i pulsanti scelti con l'aspetto scelto; **Ripristina aspetto** riporta solo questi valori a quelli di serie, con tutti i pulsanti.
 
 Dopo **Fine intro qui** e **Inizio titoli qui** compare per un attimo il valore salvato (per esempio "Intro fino a 1:32 ✓"). Se premi **Fine intro qui** nei primi 5 secondi, o **Inizio titoli qui** lasciando meno di un minuto di episodio, dice **Troppo presto** e non salva niente.
 
@@ -288,7 +293,7 @@ La guida tecnica (come è fatto il sito, perché l'estensione funziona così, pu
 - **Il video parte muto anche avviandolo a mano:** il player ricorda lo stato "muto". Riattiva l'audio una volta dal controllo del volume del player.
 - **Il volume è rimasto basso dopo il timer di spegnimento:** la pagina è stata chiusa durante la dissolvenza e il player ha ricordato il volume. Rialzalo una volta dal player.
 - **L'intro non viene saltata:** l'opzione **Salta l'intro** è spenta, l'intro di quella serie non è segnata (controlla l'elenco nel menu) oppure l'episodio è ripartito da un punto preciso, per esempio da "continua a guardare" del sito.
-- **La barra di pulsanti non compare:** muovi il mouse sopra il video. **Fine intro qui** e **Inizio titoli qui** compaiono solo nei primi e negli ultimi 10 minuti, e mai in modalità minimale.
+- **La barra di pulsanti non compare:** muovi il mouse sopra il video. **Fine intro qui** e **Inizio titoli qui** compaiono solo nei primi e negli ultimi 10 minuti. Controlla anche in **Interfaccia sul video › Pulsanti sulla barra** che i pulsanti siano accesi: se sono tutti spenti la barra non compare.
 - **Sono rimasto bloccato a schermo intero:** premi **Esc**, oppure **F11**.
 - **Una scorciatoia non fa niente:** apri la guida (Alt+Shift+H o **?** sulla barra) o il menu in **Riproduzione › Scorciatoie da tastiera**: se è segnata come non assegnata o in conflitto, sceglila in `brave://extensions/shortcuts`. Le scorciatoie non funzionano mentre scrivi in un campo di testo.
 - **Cerca aggiornamento dice "Repository non trovato o privato":** il repository è privato o ha cambiato nome. Il controllo funziona solo con il repository pubblico `MashaUP/Keep_Watching`.
@@ -303,7 +308,7 @@ La guida tecnica (come è fatto il sito, perché l'estensione funziona così, pu
 ## Struttura dei file
 
 ```
-Keep_Watching-1.4.0.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
+Keep_Watching-1.4.1.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
 version.json                 ultima versione pubblicata, letta da "Cerca aggiornamento"
 manifest.json                configurazione dell'estensione (Manifest V3)
 rules.json                   regola di rete: blocca il primo caricamento del player senza permesso di autoplay

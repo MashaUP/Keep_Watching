@@ -21,6 +21,25 @@ module.exports = async () => {
     assert.deepEqual(D.kwSanitize(null), D.kwSanitize({}));
   });
 
+  await test('pulsanti della barra: tutti di serie, scelte singole conservate', () => {
+    const all = D.kwSanitize({}).toolbar;
+    assert.deepEqual(Object.keys(all), ['skipIntro', 'quick', 'setIntro', 'setCredits', 'stopAtEnd', 'help']);
+    assert.ok(Object.values(all).every((v) => v === true));
+    const s = D.kwSanitize({ toolbar: { help: false, setCredits: 'no', x: false } }).toolbar;
+    assert.equal(s.help, false);
+    assert.equal(s.setCredits, true, 'valore non valido → di serie');
+    assert.equal('x' in s, false);
+    assert.ok(D.KW_UI_KEYS.includes('toolbar') && !D.KW_UI_KEYS.includes('uiMinimal'));
+  });
+
+  await test('pulsanti della barra: chi aveva la modalità minimale (1.4.0) ritrova gli stessi pulsanti', () => {
+    const s = D.kwSanitize({ uiMinimal: true }).toolbar;
+    assert.deepEqual(s, { skipIntro: true, quick: true, setIntro: false, setCredits: false, stopAtEnd: false, help: false });
+    assert.ok(Object.values(D.kwSanitize({ uiMinimal: false }).toolbar).every(Boolean));
+    assert.equal(D.kwSanitize({ uiMinimal: true, toolbar: { help: true } }).toolbar.setIntro, true, 'se c\'è già toolbar vale quella');
+    assert.equal('uiMinimal' in D.kwSanitize({ uiMinimal: true }), false, 'la vecchia chiave non viene più scritta');
+  });
+
   await test('popup: il controllo globale nasconde tutto ma non cambia le preferenze singole', () => {
     const s = D.kwSanitize({ popups: { confirm: false } });
     assert.equal(D.kwPopupVisible(s, 'countdown'), true);

@@ -285,6 +285,7 @@ Con DevTools aperto, Ctrl+F8 attivo e filtro `Keep_Watching` in Console:
 - [ ] "Nascondi tutti i popup sul video": il cambio episodio avviene senza riquadro; spegnendolo le categorie tornano come prima.
 - [ ] Profilo Notturno: menu "Personalizzato" dopo una modifica, "Ripristina il profilo" la annulla.
 - [ ] Aspetto: opacità, posizione e dimensione si vedono sul player senza ricaricare.
+- [ ] Pulsanti sulla barra: spegnendone uno sparisce dal player senza ricaricare; con tutti spenti la barra non compare e le scorciatoie funzionano.
 - [ ] Statistiche: dopo qualche minuto di visione il tempo cresce, la pausa non lo fa crescere; esportazione CSV aperta in Excel con le lettere accentate corrette.
 - [ ] "Cerca aggiornamento" con il repository pubblico reale: versione installata, ultima pubblicata, nessun errore.
 - [ ] Aggiornamento completo: scarica lo zip, estrai sopra la cartella, "Ho estratto lo zip: ricarica l'estensione", riapri il menu e controlla "Aggiornamento installato".
@@ -400,7 +401,7 @@ Test fatti sul sito di prova: flusso video che si interrompe a metà, salto di 1
 
 Tutte le chiavi di `chrome.storage.local` sono documentate in cima a `src/defaults.js`. Le impostazioni passano sempre da `kwSanitize()` (player, service worker, popup): un valore di tipo sbagliato o fuori dall'elenco (`KW_CHOICES`) torna a quello predefinito, `popups` viene completato con le categorie mancanti, `uiOpacity` è limitata a 40–100, `skipCredits` a 0–3599.
 
-All'installazione e a ogni aggiornamento (`chrome.runtime.onInstalled`) il service worker esegue `migrateSettings()`: legge tutto, scrive i valori validati e `settingsSchema` (2 dalla 1.4.0). Chi arriva dalla 1.3.0 conserva tutte le sue scelte; le chiavi nuove prendono il valore di serie. Con `reason === 'update'` salva anche `whatsNew` (versione nuova e precedente), che il menu mostra una volta in Panoramica.
+All'installazione e a ogni aggiornamento (`chrome.runtime.onInstalled`) il service worker esegue `migrateSettings()`: legge tutto, scrive i valori validati e `settingsSchema` (2 dalla 1.4.0, 3 dalla 1.4.1). Chi arriva dalla 1.3.0 conserva tutte le sue scelte; le chiavi nuove prendono il valore di serie. Con `reason === 'update'` salva anche `whatsNew` (versione nuova e precedente), che il menu mostra una volta in Panoramica.
 
 Le statistiche sono separate dalle impostazioni (`stats`), così azzerare l'una non tocca l'altra. Se `stats` non è leggibile viene ricostruito vuoto e la copia rovinata finisce in `statsCorrupt`.
 
@@ -416,7 +417,9 @@ Le notifiche sul desktop seguono solo `notifyEnd` e non dipendono dai popup. La 
 
 **Profili** (`KW_PROFILES`): ogni profilo ha un `preset` con solo le chiavi che cambia. `kwProfileChanges(id, attuali)` restituisce le modifiche da scrivere (più `profile`), applicate una volta sola al click: niente sovrascrive in seguito le scelte dell'utente. `kwProfileDiff(id, impostazioni)` elenca le chiavi diverse dal preset (anche `popups.<categoria>`): se non è vuoto il menu mostra "Personalizzato". I profili non toccano `sleep`, `stopAfter`, aspetto, scorciatoie e statistiche.
 
-**Aspetto**: `uiSize`, `uiDensity`, `uiOpacity`, `uiPosition`, `uiAutoHide`, `uiMinimal`, `uiReduceMotion` (elenco in `KW_UI_KEYS`, usato da "Ripristina aspetto"). `kwApplyUiVars()` in `panel.js` li traduce in variabili CSS sugli host Shadow DOM (`--kw-scale`, `--kw-gap`, `--kw-alpha`): l'opacità vale solo per lo sfondo, il testo resta pieno. `prefers-reduced-motion: reduce` disattiva le animazioni anche senza l'opzione.
+**Aspetto**: `uiSize`, `uiDensity`, `uiOpacity`, `uiPosition`, `uiAutoHide`, `toolbar`, `uiReduceMotion` (elenco in `KW_UI_KEYS`, usato da "Ripristina aspetto"). `kwApplyUiVars()` in `panel.js` li traduce in variabili CSS sugli host Shadow DOM (`--kw-scale`, `--kw-gap`, `--kw-alpha`): l'opacità vale solo per lo sfondo, il testo resta pieno. `prefers-reduced-motion: reduce` disattiva le animazioni anche senza l'opzione.
+
+**Pulsanti della barra** (dalla 1.4.1): `toolbar` è un oggetto `{ skipIntro, quick, setIntro, setCredits, stopAtEnd, help }` (elenco ed etichette in `KW_TOOLBAR_BUTTONS`; gli id sono quelli dei pulsanti in `toolbarButtons()` di `player.js`). `toolbarButtons()` calcola i pulsanti utili in quel momento e alla fine toglie quelli spenti; se non ne resta nessuno `toolbar.js` nasconde la barra. I comandi da tastiera non guardano `toolbar`. Fino alla 1.4.0 c'era `uiMinimal`: `kwSanitize` la converte (se `toolbar` non esiste ancora) in `KW_TOOLBAR_MINIMAL`, e `migrateSettings()` cancella la vecchia chiave.
 
 ## 16. Scorciatoie e guida
 
@@ -477,7 +480,7 @@ tests/e2e/run_all.sh
 | `test_quick_skip.py` | Salto avanti ripetuto, in pausa, a fine video, dopo la ricreazione dei controlli, da scorciatoia, ignorato mentre si scrive |
 | `test_popups.py` | Categorie nascoste e "nascondi tutti" con le automazioni attive, limite in modo sicuro, recupero silenzioso |
 | `test_stats.py` | Tempo reale, pause, velocità 2×, sessioni, completamenti, intro e titoli, raccolta spenta, azzeramento |
-| `test_guide_ui.py` | Guida alle scorciatoie, Esc, chiusura automatica, aspetto della barra sul player |
-| `test_popup.py` | Menu: impostazioni, popup, aspetto, profili, statistiche (grafico, CSV, JSON, importazione, azzeramento), centro aggiornamenti con GitHub finto, novità, verifica dopo la ricarica, Ko-fi |
+| `test_guide_ui.py` | Guida alle scorciatoie, Esc, chiusura automatica, aspetto della barra e scelta dei pulsanti sul player |
+| `test_popup.py` | Menu: migrazione dalla 1.4.0, impostazioni, popup, pulsanti e aspetto della barra, profili, statistiche (grafico, CSV, JSON, importazione, azzeramento), centro aggiornamenti con GitHub finto, novità, verifica dopo la ricarica, Ko-fi |
 
 **Da provare a mano** (non riproducibili sul sito di prova): il sito e il player reali, l'API vera di GitHub con il repository pubblico, `chrome.runtime.reload()` dopo l'estrazione dello zip (in Chromium avviato da Playwright l'estensione ricaricata non torna disponibile), le scorciatoie premute davvero in Brave e i conflitti con altre estensioni, la pausa con la scheda nascosta, `tools/package.ps1` su Windows.
