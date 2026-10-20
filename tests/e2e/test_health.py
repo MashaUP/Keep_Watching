@@ -83,6 +83,36 @@ async def main():
         check(len(await k.events()) == 0, 'cronologia cancellata (con conferma)')
         check((await k.get('countdown'))['countdown'] == 0, 'cancellare la cronologia non tocca le impostazioni')
 
+    print('Player su vixcloud.cc (dominio usato dal sito da ottobre 2026)')
+    async with KW(quiet=True) as k:
+        await config(k.page, playerhost='vixcloud.cc')
+        await k.set({'countdown': 0})
+        await k.open()
+        check('vixcloud.cc' in k.player().url and 'kw_autoplay=1' in k.player().url, 'player su vixcloud.cc caricato con il permesso di autoplay')
+        await asyncio.sleep(3)
+        th = await wait_for(lambda: _state(k, 'playing'), 8)
+        check(th, 'script del player attivo su vixcloud.cc: in riproduzione')
+        res = await k.verify(th['tabId'])
+        c = by_id(res)
+        check(all(c[x]['status'] == 'ok' for x in ('site', 'frame', 'player', 'autoplay')) and 'vixcloud.cc' in c['frame']['text'],
+              f'Verifica tutto: sito, iframe ({c["frame"]["text"]}), player e autoplay Funzionante')
+        await k.seek((await k.video())['dur'] - 2)
+        check(await wait_for(lambda: _ep(k, '2'), 12), 'cambio episodio automatico anche su vixcloud.cc')
+        await config(k.page, playerhost='vixcloud.co')
+
+    print('Player su un dominio non ancora supportato')
+    async with KW(quiet=True) as k:
+        await config(k.page, playerhost='vixcloud.xyz')
+        await k.page.goto('http://127.0.0.1:8000/it/watch/1')
+        msgs = await wait_for(lambda: _has(k, 'Player su un dominio non supportato: vixcloud.xyz'), 22)
+        check(msgs, f'cronologia: il dominio del player è indicato per nome ({msgs})')
+        th = await k.tab_health()
+        res = await k.verify(th['tabId'])
+        c = by_id(res)
+        check(c['site']['status'] == 'ok' and c['frame']['detail'] == 'error' and 'vixcloud.xyz' in c['frame']['text'], f'Verifica tutto: {c["frame"]["text"]}')
+        check(th['site'].get('otherPlayer') == 'vixcloud.xyz', 'stato della scheda con il dominio trovato')
+        await config(k.page, playerhost='vixcloud.co')
+
     print('Clic su "prossimo episodio" senza effetto')
     async with KW(quiet=True) as k:
         await config(k.page, deadnext=1)
@@ -113,7 +143,7 @@ async def main():
     async with KW(quiet=True) as k:
         await config(k.page, noplayer=1)
         await k.page.goto('http://127.0.0.1:8000/it/watch/1')
-        msgs = await wait_for(lambda: _has(k, 'senza il player vixcloud'), 22)
+        msgs = await wait_for(lambda: _has(k, 'senza un player supportato'), 22)
         check(msgs, 'cronologia: pagina dell\'episodio senza player')
         th = await k.tab_health()
         res = await k.verify(th['tabId'])

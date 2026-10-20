@@ -3,7 +3,7 @@
  *
  * Gira nelle pagine del sito (…/it/iframe/<id> e …/it/watch/<id>).
  *
- * Problema: l'iframe del player (vixcloud.co/embed/…) è scritto nell'HTML della pagina
+ * Problema: l'iframe del player (vixcloud.co o vixcloud.cc /embed/…, vedi hosts.js) è scritto nell'HTML della pagina
  * …/it/iframe/<id> senza allow="autoplay". Senza quel permesso Chrome non considera il
  * click dell'utente sulla pagina principale e blocca l'avvio con audio del nuovo episodio.
  * Il browser avvia il caricamento dell'iframe mentre legge l'HTML, prima che qualsiasi
@@ -22,9 +22,8 @@
   'use strict';
 
   const TAG = '[Keep_Watching]';
-  // Solo il player su vixcloud.co (o un suo sottodominio): host esplicito, non una parola
-  // qualsiasi nell'indirizzo.
-  const PLAYER_RE = /^(https?:)?\/\/([a-z0-9-]+\.)*vixcloud\.co(:\d+)?\//i;
+  // Solo il player sugli host di KW_PLAYER_HOSTS (hosts.js) o loro sottodomini: host
+  // esplicito, non una parola qualsiasi nell'indirizzo.
   const REQUIRED = ['autoplay', 'fullscreen'];
   const MARK = 'kw_autoplay=1';
 
@@ -32,7 +31,7 @@
     const src = frame.getAttribute('src') || '';
     // Solo l'iframe del player. Se il sito ne assegna l'URL in un secondo momento,
     // la modifica di src fa ripassare l'iframe da qui.
-    if (!PLAYER_RE.test(src)) return;
+    if (!kwIsPlayerUrl(src)) return;
 
     // 1. Permesso, prima di toccare l'URL.
     const current = (frame.getAttribute('allow') || '')

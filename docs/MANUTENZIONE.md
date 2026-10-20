@@ -44,7 +44,7 @@ top      https://<dominio>/it/watch/66161?e=370641
      │      Ha allow="autoplay; fullscreen". Si RICARICA a ogni episodio.
      │      L'iframe del player è scritto direttamente nel suo HTML.
      │
-     └─ iframe  https://vixcloud.co/embed/789971?token=…&expires=…&nextEpisode=1
+     └─ iframe  https://vixcloud.cc/embed/789971?token=…&expires=…&nextEpisode=1   (fino a ottobre 2026: vixcloud.co)
                 Player JW Player 8 (con hls.js). Dominio diverso dal sito.
                 SENZA attributo allow. Nuovo a ogni episodio.
 ```
@@ -116,7 +116,7 @@ Questa è la parte più delicata dell'estensione ed è stata la più difficile d
 
 | Dipendenza | Dove si trova nel codice | Sintomo se cambia |
 |---|---|---|
-| Dominio del player `vixcloud.co` | `manifest.json` (primo `matches`), `rules.json` (`requestDomains`), `autoplay-permission.js` (`PLAYER_HOST`) | L'estensione non fa più nulla |
+| Dominio del player (`vixcloud.co`, `vixcloud.cc`) | `src/hosts.js` (`KW_PLAYER_HOSTS`), `manifest.json` (primo `matches`), `rules.json` (`requestDomains`) | Il player non riceve gli script: niente cambio episodio, salti, barra. Centro salute e cronologia indicano il dominio trovato. Vedi "Il player cambia dominio" qui sotto |
 | Percorso `/embed/` del player | `manifest.json`, `rules.json` (`urlFilter`) | L'estensione non fa più nulla |
 | Percorso `/iframe/` o `/watch/` delle pagine del sito | `manifest.json` (secondo `matches`) | **Il player non si carica** (bloccato da `rules.json`) |
 | Classe `.next-episode` nella barra `.jw-controlbar` | `player.js` (`NEXT_SELECTOR`) | Notifica "pulsante non trovato" a fine episodio |
@@ -127,6 +127,18 @@ Questa è la parte più delicata dell'estensione ed è stata la più difficile d
 | Pulsante `.jw-icon-fullscreen` | `player.js` (`FULLSCREEN_SELECTOR`) | In modalità cinema il pulsante non fa uscire (Esc funziona comunque) |
 | JW Player usa un unico `<video>` con eventi standard | `player.js` | Fine episodio non rilevata |
 | Il parametro in più `kw_autoplay=1` è accettato dal server | `autoplay-permission.js` (`MARK`) | Il player dà errore dopo il caricamento |
+
+### Il player cambia dominio
+
+Successo nell'ottobre 2026: il player è passato da `vixcloud.co` a `vixcloud.cc` (versione 1.5.1). Sintomi: nell'elenco dei contesti della Console il frame del player (per esempio `784302 vixcloud.cc`) non ha Keep_Watching tra le estensioni; Centro salute e cronologia dicono "Player su un dominio non supportato: …" (se il nuovo dominio è ancora `vixcloud.*`) oppure "Pagina dell'episodio senza un player supportato" con gli host degli iframe trovati.
+
+Per aggiungere un dominio, nelle tre posizioni (il browser vuole i domini scritti per esteso):
+
+1. `src/hosts.js` → `KW_PLAYER_HOSTS`;
+2. `manifest.json` → `content_scripts[0].matches` (`*://nuovo/embed/*` e `*://*.nuovo/embed/*`);
+3. `rules.json` → `requestDomains` di entrambe le regole.
+
+Poi `node tests/run.js` (`tests/unit/hosts.test.js`), una prova sul sito di prova con `/__config?playerhost=…` (aggiungendo il dominio alle `--host-resolver-rules` in `tests/e2e/kw.py`) e Verifica tutto sul sito reale.
 
 ## 5. Fare debug sul sito
 

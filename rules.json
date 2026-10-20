@@ -2,21 +2,35 @@
   {
     "id": 1,
     "priority": 2,
-    "action": { "type": "allow" },
+    "action": {
+      "type": "allow"
+    },
     "condition": {
       "urlFilter": "kw_autoplay=1",
-      "requestDomains": ["vixcloud.co"],
-      "resourceTypes": ["sub_frame"]
+      "requestDomains": [
+        "vixcloud.co",
+        "vixcloud.cc"
+      ],
+      "resourceTypes": [
+        "sub_frame"
+      ]
     }
   },
   {
     "id": 2,
     "priority": 1,
-    "action": { "type": "block" },
+    "action": {
+      "type": "block"
+    },
     "condition": {
       "urlFilter": "/embed/",
-      "requestDomains": ["vixcloud.co"],
-      "resourceTypes": ["sub_frame"]
+      "requestDomains": [
+        "vixcloud.co",
+        "vixcloud.cc"
+      ],
+      "resourceTypes": [
+        "sub_frame"
+      ]
     }
   }
 ]

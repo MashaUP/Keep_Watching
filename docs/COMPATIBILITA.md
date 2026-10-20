@@ -19,7 +19,7 @@ Un solo sito e un solo player. Nessun altro servizio è supportato e l'estension
 |---|---|
 | Sito | StreamingCommunity (il dominio principale cambia spesso: non viene usato) |
 | Riconoscimento della pagina | Percorso `…/watch/<id>` (pagina principale) e `…/iframe/<id>` (iframe intermedio), **più** la presenza dell'iframe del player su `vixcloud.co` |
-| Player | `vixcloud.co/embed/<id>` (o un sottodominio di vixcloud.co), JW Player 8 con hls.js e `<video>` HTML5 |
+| Player | `vixcloud.co/embed/<id>` o `vixcloud.cc/embed/<id>` (e loro sottodomini; il sito è passato a vixcloud.cc nell'ottobre 2026), JW Player 8 con hls.js e `<video>` HTML5. Elenco in `src/hosts.js` |
 | Dove sta il player | In un iframe di un'altra origine, dentro l'iframe intermedio del sito |
 | Dati dall'URL del player | `t` titolo (base64), `d` episodio "S1:E2 Nome" (base64), `nextEpisode=1` se c'è un successivo, `minute=N` punto di partenza |
 | Dati dal DOM del player | `.jwplayer` (contenitore), `.jw-controlbar .next-episode` (prossimo episodio), `.jw-icon-fullscreen` |
@@ -59,7 +59,7 @@ Un solo sito e un solo player. Nessun altro servizio è supportato e l'estension
 6. **Ogni errore del video provocava una ricarica**, anche l'interruzione dovuta a un cambio pagina (codice 1). Ora gli errori sono classificati per codice; senza che il video sia mai partito non si ricarica (rischio di girare a vuoto), si dice cosa fare.
 7. **Ripresa mai verificata.** Dopo la ricarica si dava per riuscita la ripresa. Ora il recupero è "riuscito" solo se il video torna davvero ad avanzare entro 20 secondi; altrimenti è registrato come fallito.
 8. **Avvio bloccato dal browser** (`NotAllowedError` anche senza audio) registrato solo in console. Ora diventa uno stato "serve un'azione" con un avviso sul player.
-9. **Riconoscimento del player troppo largo.** Bastava la parola "vixcloud" nell'indirizzo dell'iframe. Ora serve l'host vixcloud.co.
+9. **Riconoscimento del player troppo largo.** Bastava la parola "vixcloud" nell'indirizzo dell'iframe. Ora serve uno degli host dell'elenco (`src/hosts.js`).
 10. **Messaggi senza controllo del mittente.** Azzeramento e importazione delle statistiche erano accettati da qualsiasi script dell'estensione, anche quelli nelle pagine del sito. Ora le operazioni che cancellano dati (e Verifica tutto) sono accettate solo dalle pagine dell'estensione; ogni messaggio deve venire dall'estensione stessa.
 11. **Icone come caratteri** (▶ ✓ ⏾ ?) nei riquadri del player: sostituite da icone vettoriali.
 
@@ -105,6 +105,7 @@ Durante il cambio episodio pause e buffering del vecchio video non cambiano lo s
 | A4 | Player sostituito al cambio episodio | Il documento del player viene scaricato | Sì, è il comportamento normale | Lo stato passa per `pendingPlayAt` in storage | — |
 | A5 | Iframe dell'episodio senza player | `site-health.js`: nessun iframe vixcloud dopo 15 s | No dall'estensione | Evento "pagina senza player"; Verifica tutto lo segnala | Pagina di errore del sito o struttura cambiata |
 | A6 | Player presente ma senza video | Contenitore JW senza `<video>` dopo 30 s | No | Stato "non compatibile", evento con la causa probabile | — |
+| A8 | Player spostato su un altro dominio (successo: vixcloud.co → vixcloud.cc) | `site-health.js`: iframe con host `vixcloud.*` non in elenco | No dall'estensione | Evento e Verifica tutto con il nome del dominio trovato | Il browser vuole i domini scritti nel manifest: serve una nuova versione |
 | A7 | Player in un iframe di altra origine | — | — | Lo script del player gira direttamente nell'iframe di vixcloud (`all_frames`) | L'estensione non legge il DOM di altre origini da fuori |
 | B1 | In riproduzione ma il tempo non avanza | Sorveglianza ogni 2 s: avanzamento confrontato con il tempo trascorso | Spesso | Salto di 1 s, poi ricarica dal secondo giusto | Una ricarica per episodio e una ogni 3 min |
 | B2 | Buffering prolungato | `waiting`, `readyState < 3` | Spesso | Come B1, dopo 12 s; l'evento distingue "in attesa di dati" da "fermo con dati" | Non si distingue una rete lenta da un server fermo |
@@ -132,7 +133,7 @@ Durante il cambio episodio pause e buffering del vecchio video non cambiano lo s
 
 ## 5. Tabella dei fallback
 
-Sito/provider di tutte le righe: **StreamingCommunity con player vixcloud.co (JW Player 8, `<video>` HTML5)**.
+Sito/provider di tutte le righe: **StreamingCommunity con player vixcloud.co o vixcloud.cc (JW Player 8, `<video>` HTML5)**.
 
 | Problema | Rilevamento | Tentativo automatico | Fallback successivo | Limiti | Esito verificabile | Stato |
 |---|---|---|---|---|---|---|

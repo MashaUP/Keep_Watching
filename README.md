@@ -2,7 +2,7 @@
 
 Estensione per Brave e Chrome che su StreamingCommunity passa da sola all'episodio successivo quando quello corrente finisce, e lo fa partire con l'audio. Salta l'intro e i titoli di coda serie per serie, ha un timer di spegnimento, fa ripartire lo streaming quando si blocca e tiene statistiche di visione solo sul tuo computer. Quando qualcosa non va, il **Centro salute** dice cosa funziona davvero e la **Cronologia** cosa è successo.
 
-Versione 1.5.0
+Versione 1.5.1
 
 > **Importante:** il browser lascia partire l'audio da solo solo dopo un tuo click sulla pagina. Apri l'episodio e premi play una volta: da lì in poi fa tutto l'estensione.
 
@@ -37,7 +37,7 @@ Funziona su Brave e Chrome per computer (Edge e altri browser Chromium non sono 
 
 | Sito | Player | Stato |
 |---|---|---|
-| StreamingCommunity (qualsiasi dominio, riconosciuto dalla struttura delle pagine `/watch/` e `/iframe/`) | vixcloud.co (JW Player 8) | Funzioni di base (permesso di autoplay, cambio episodio, avvio con audio) verificate sul sito reale durante lo sviluppo; le altre verificate su un sito di prova con la stessa struttura. Le novità della 1.5.0 (verifica del cambio, Centro salute, cronologia) non sono ancora state provate sul sito reale |
+| StreamingCommunity (qualsiasi dominio, riconosciuto dalla struttura delle pagine `/watch/` e `/iframe/`) | vixcloud.co e vixcloud.cc (JW Player 8) | Funzioni di base (permesso di autoplay, cambio episodio, avvio con audio) verificate sul sito reale durante lo sviluppo; le altre verificate su un sito di prova con la stessa struttura. Le novità della 1.5.0 (verifica del cambio, Centro salute, cronologia) non sono ancora state provate sul sito reale |
 
 Nessun altro sito è supportato. Il dettaglio per ogni funzione, con i guasti possibili e i piani di ripresa, è in **[docs/COMPATIBILITA.md](docs/COMPATIBILITA.md)**.
 
@@ -51,7 +51,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 ## 1. Carica il progetto su GitHub
 
 1. Crea un nuovo repository, per esempio `Keep_Watching`. Deve essere **pubblico** perché **Cerca aggiornamento** funzioni: GitHub risponde senza accesso solo per i repository pubblici. Se lo vuoi privato l'estensione funziona lo stesso, ma il controllo degli aggiornamenti dirà "Repository non trovato o privato".
-2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.5.0.zip` e le cartelle devono stare al primo livello.
+2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.5.1.zip` e le cartelle devono stare al primo livello.
 
 `version.json` e lo zip nella radice sono quello che legge **Cerca aggiornamento**. Se un giorno pubblichi le versioni come **release** di GitHub (con lo zip allegato), l'estensione usa quelle.
 
@@ -59,7 +59,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 
 ### 2.1 Estrai lo zip
 
-1. Scarica `Keep_Watching-1.5.0.zip` (dal repository, oppure dalla cartella del progetto).
+1. Scarica `Keep_Watching-1.5.1.zip` (dal repository, oppure dalla cartella del progetto).
 2. Estrailo con **Estrai qui**: ottieni la cartella `Keep_Watching`, con dentro `manifest.json`.
 3. Mettila in un posto dove resta: il browser carica l'estensione da lì ogni volta. Se la cancelli, l'estensione smette di funzionare.
 
@@ -82,7 +82,7 @@ Durante l'installazione il browser avvisa che l'estensione può **leggere e modi
 | `notifications` | Notifiche sul desktop |
 | `declarativeNetRequest` | Bloccare il primo caricamento del player, che parte senza permesso di autoplay, così che l'estensione lo rifaccia con il permesso |
 | Pagine `*/watch/*` e `*/iframe/*` | Dare al player il permesso di autoplay, schermo intero tra episodi, ricarica dello streaming bloccato |
-| Player `vixcloud.co/embed/*` | Controllare il player |
+| Player `vixcloud.co/embed/*` e `vixcloud.cc/embed/*` | Controllare il player (dall'ottobre 2026 il sito usa vixcloud.cc) |
 
 Le versioni 1.4 e 1.5 non aggiungono permessi: il controllo degli aggiornamenti usa l'API pubblica di GitHub, che risponde a qualsiasi pagina, l'esportazione usa il normale download del browser, e **Verifica tutto** raccoglie le risposte delle pagine dell'episodio senza chiedere di leggere le tue schede (niente permessi `tabs` o `webNavigation`).
 
@@ -102,7 +102,7 @@ Il browser non assegna una combinazione se è già usata da un'altra estensione:
 
 ### 2.5 Verifica
 
-1. Apri un episodio, apri gli strumenti per sviluppatori dal menu del browser (**Altri strumenti › Strumenti per sviluppatori**) e, nella scheda **Sources**, premi **Ctrl+F8**: senza questo passaggio il player si chiude con "Connessione negata da vixcloud.co" (vedi **Problemi comuni**).
+1. Apri un episodio, apri gli strumenti per sviluppatori dal menu del browser (**Altri strumenti › Strumenti per sviluppatori**) e, nella scheda **Sources**, premi **Ctrl+F8**: senza questo passaggio il player si chiude con "Connessione negata da vixcloud.cc" (o .co) (vedi **Problemi comuni**).
 2. Nella scheda **Console** scrivi `Keep_Watching` nel campo filtro e ricarica la pagina.
 3. Deve comparire `[Keep_Watching] Player caricato con permesso: autoplay; fullscreen`. Se c'è, l'estensione è attiva sul player.
 
@@ -343,7 +343,7 @@ La guida tecnica (come è fatto il sito, perché l'estensione funziona così, pu
 Prima di tutto: apri il menu in **Centro salute**, premi **Verifica tutto** e guarda le voci in errore e gli **Ultimi problemi**; in **Cronologia** filtra **Solo errori**. Spesso il motivo è già scritto lì.
 
 
-- **"Connessione negata da vixcloud.co" aprendo gli strumenti per sviluppatori:** il player ha una protezione contro gli strumenti per sviluppatori. Nella scheda **Sources** premi **Ctrl+F8** e ricarica la pagina. Anche F12 viene bloccato: apri gli strumenti dal menu del browser.
+- **"Connessione negata da vixcloud.cc" (o .co) aprendo gli strumenti per sviluppatori:** il player ha una protezione contro gli strumenti per sviluppatori. Nella scheda **Sources** premi **Ctrl+F8** e ricarica la pagina. Anche F12 viene bloccato: apri gli strumenti dal menu del browser.
 - **Il player mostra una pagina di errore o non si carica:** probabilmente il sito ha cambiato il percorso delle pagine (`/watch/`, `/iframe/`) e l'estensione non riesce più a dare il permesso al player. Sospendi l'estensione (Alt+Shift+K) per guardare e vedi `docs/MANUTENZIONE.md`.
 - **A fine episodio non succede niente:** controlla che **Estensione attiva** e **Prossimo episodio automatico** siano accesi, che il profilo non sia **Manuale** e che l'icona non mostri **OFF**. Se arriva la notifica **pulsante non trovato**, il sito ha cambiato la barra del player.
 - **Non vedo più il conto alla rovescia o altri messaggi sul video:** controlla **Interfaccia sul video › Popup sul video**: forse è acceso **Nascondi tutti i popup sul video** o la categoria è spenta. Le automazioni funzionano comunque.
@@ -362,6 +362,7 @@ Prima di tutto: apri il menu in **Centro salute**, premi **Verifica tutto** e gu
 - **Non arrivano le notifiche:** controlla **Notifiche sul desktop** nel menu e, in Windows, **Impostazioni › Sistema › Notifiche** per Brave.
 - **"Cambio episodio non riuscito" sul player:** il clic su "prossimo episodio" non ha avuto effetto due volte. Premilo tu o ricarica la pagina. Se succede sempre, il sito ha cambiato il pulsante: segnalalo con la cronologia esportata.
 - **Centro salute dice "Nessun episodio in questa scheda" mentre guardi:** la pagina è appena stata aperta (aspetta qualche secondo) oppure il sito ha cambiato i percorsi `/watch/` e `/iframe/`: premi **Verifica tutto**.
+- **Verifica tutto o la cronologia dicono "Player su un dominio non supportato":** il sito ha spostato il player su un altro indirizzo: l'estensione va aggiornata (la 1.5.1 aggiunge vixcloud.cc, usato dal sito da ottobre 2026).
 - **Verifica tutto dice "Player non compatibile" o "pagina dell'episodio senza player":** il sito mostra una pagina di errore o ha cambiato player. Ricarica la pagina; se resta così, l'estensione va aggiornata.
 - **Nella console compare "A listener indicated an asynchronous response…":** non viene da Keep_Watching, i cui messaggi iniziano sempre con `[Keep_Watching]`. Viene da un'altra estensione installata.
 - **Dopo l'aggiornamento l'estensione non cambia:** ricarica l'estensione in `brave://extensions` e poi la pagina dell'episodio. Se la nuova versione ha permessi nuovi, rimuovila e caricala di nuovo.
@@ -379,7 +380,7 @@ Il file contiene solo gli eventi: niente cookie, token o indirizzi completi. Con
 
 ## Limiti noti
 
-- Funziona solo con StreamingCommunity e il player vixcloud.co. Se il sito cambia struttura, il Centro salute lo segnala, ma l'estensione va aggiornata.
+- Funziona solo con StreamingCommunity e il player su vixcloud.co o vixcloud.cc. Se il sito sposta il player su un altro dominio, il Centro salute e la cronologia lo indicano per nome ("Player su un dominio non supportato: …"), ma l'estensione va aggiornata.
 - L'estensione non vede gli errori interni del player (hls.js, JW Player), solo i loro effetti sul video; non si accorge di un'immagine ferma se il tempo continua ad avanzare.
 - Intro e titoli si riconoscono solo dai tempi che segni tu: l'estensione non analizza le immagini. Due serie con lo stesso titolo condividono i segni.
 - Il primo avvio con audio richiede un tuo click: è una regola del browser e non viene aggirata.
@@ -396,7 +397,7 @@ Il file contiene solo gli eventi: niente cookie, token o indirizzi completi. Con
 ## Struttura dei file
 
 ```
-Keep_Watching-1.5.0.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
+Keep_Watching-1.5.1.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
 version.json                 ultima versione pubblicata, letta da "Cerca aggiornamento"
 manifest.json                configurazione dell'estensione (Manifest V3)
 rules.json                   regola di rete: blocca il primo caricamento del player senza permesso di autoplay
@@ -412,6 +413,7 @@ src/guide.js                 guida alle scorciatoie sul player
 src/autoplay-permission.js   pagine del sito: permesso di autoplay al player
 src/cinema.js                pagine del sito: player a tutta finestra tra un episodio e l'altro
 src/recovery.js              pagine del sito: ricarica dell'episodio quando lo streaming si blocca
+src/hosts.js                 domini del player supportati (unico punto da aggiornare insieme a manifest e rules.json)
 src/site-health.js           pagine del sito: riconoscimento della struttura e risposte a "Verifica tutto"
 src/popup/                   menu dell'icona (HTML, CSS, JS)
 icons/                       icone 16, 32, 48 e 128 px

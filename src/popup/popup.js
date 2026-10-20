@@ -866,7 +866,8 @@
     const p = th && th.player && th.player.state !== 'closed' ? th.player : null;
     const site = th && th.site;
     const rows = [];
-    if (site && site.playerMissing) rows.push(['Sito', 'Pagina dell\'episodio senza player (errore del sito o struttura cambiata)', 'error']);
+    if (site && site.playerMissing && site.otherPlayer) rows.push(['Sito', `Il player è su ${site.otherPlayer}, un dominio non ancora supportato: serve aggiornare l'estensione`, 'error']);
+    else if (site && site.playerMissing) rows.push(['Sito', 'Pagina dell\'episodio senza player (errore del sito o struttura cambiata)', 'error']);
     else if (site && site.recognized === false) rows.push(['Sito', 'Pagina /watch/ con struttura diversa da quella prevista', 'error']);
     else if ((site && site.recognized) || p) rows.push(['Sito', `StreamingCommunity${site && site.host ? ` (${site.host})` : ''}`, 'ok']);
 

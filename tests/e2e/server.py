@@ -16,6 +16,7 @@ le stesse classi di JW Player che l'estensione usa (.jwplayer, .jw-controlbar,
   deadnext=1    il pulsante "prossimo episodio" c'è ma il clic non fa nulla
   noplayer=1    la pagina dell'episodio non contiene il player (pagina di errore)
   novideo=1     il player ha il contenitore di JW Player ma nessun video
+  playerhost=…  dominio del player (vixcloud.co di serie; vixcloud.cc o vixcloud.xyz per le prove)
 I video si creano con make_clips.sh (serve ffmpeg).
 """
 import base64, http.server, os, socketserver, sys, time, urllib.parse
@@ -23,7 +24,7 @@ import base64, http.server, os, socketserver, sys, time, urllib.parse
 HERE = os.path.dirname(os.path.abspath(__file__))
 CLIPS = {'short': os.path.join(HERE, 'clip-90s.webm'), 'long': os.path.join(HERE, 'clip-12min.webm')}
 PORT = int(os.environ.get('KW_PORT', '8000'))
-CONFIG = {'last': '3', 'stall': '0', 'title': 'Brothers', 'broken': '0', 'clip': 'short', 'deadnext': '0', 'noplayer': '0', 'novideo': '0'}
+CONFIG = {'last': '3', 'stall': '0', 'title': 'Brothers', 'broken': '0', 'clip': 'short', 'deadnext': '0', 'noplayer': '0', 'novideo': '0', 'playerhost': 'vixcloud.co'}
 b64 = lambda s: base64.b64encode(s.encode()).decode()
 
 
@@ -98,7 +99,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             season = 1 if ep < 3 else 2
             mparam = f'&minute={minute}' if minute else ''
             stall = '&stall=1' if CONFIG['stall'] == '1' and not minute else ''
-            src = (f"http://vixcloud.co:{PORT}/embed/{ep}?token=abc&t={urllib.parse.quote(b64(CONFIG['title']))}"
+            src = (f"http://{CONFIG['playerhost']}:{PORT}/embed/{ep}?token=abc&t={urllib.parse.quote(b64(CONFIG['title']))}"
                    f"&d={urllib.parse.quote(b64(f'S{season}:E{ep} Episodio {ep}'))}{nxt}{mparam}{stall}")
             return self.send_html(f'<!doctype html><html><body style="margin:0"><iframe ref="iframe" src="{src}" frameborder="0" height="100%" width="100%" style="position:absolute;inset:0"></iframe></body></html>')
         if u.path.startswith('/embed/'):

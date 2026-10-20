@@ -49,7 +49,7 @@ class KW:
         self.p = await async_playwright().start()
         opts = dict(headless=False, args=[
             f'--disable-extensions-except={self.ext}', f'--load-extension={self.ext}',
-            '--host-resolver-rules=MAP vixcloud.co 127.0.0.1', '--no-first-run'])
+            '--host-resolver-rules=MAP vixcloud.co 127.0.0.1, MAP vixcloud.cc 127.0.0.1, MAP vixcloud.xyz 127.0.0.1', '--no-first-run'])
         if not self.viewport:
             opts['no_viewport'] = True
         self.ctx = await self.p.chromium.launch_persistent_context(self.profile, **opts)
@@ -69,7 +69,7 @@ class KW:
         self.t0 = time.time()
         self.page.on('console', self._console)
         self.page.on('pageerror', lambda e: self._log(f'PAGEERROR {e}'))
-        await config(self.page, last=3, stall=0, title='Brothers', broken=0, clip='short', deadnext=0, noplayer=0, novideo=0)
+        await config(self.page, last=3, stall=0, title='Brothers', broken=0, clip='short', deadnext=0, noplayer=0, novideo=0, playerhost='vixcloud.co')
         return self
 
     async def _github(self, route):
@@ -140,7 +140,7 @@ class KW:
 
     # ---- player
     def player(self):
-        frames = [f for f in self.page.frames if 'vixcloud' in f.url]
+        frames = [f for f in self.page.frames if 'vixcloud' in f.url and '/embed/' in f.url]
         return frames[-1] if frames else None
 
     async def wait_player(self, timeout=10):

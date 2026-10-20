@@ -3,6 +3,19 @@
 Tutte le modifiche rilevanti del progetto sono elencate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e le versioni seguono il [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.1] - 2026-10-20
+
+### Corretto
+- **Player su vixcloud.cc**: il sito ha spostato il player da vixcloud.co a vixcloud.cc e lo script del player non partiva più (niente cambio episodio, salti, barra, avvio con audio). Ora sono supportati entrambi i domini.
+- **Riconoscimento del sito**: la pagina dell'episodio è riconosciuta anche quando la pagina principale non risponde in tempo a Verifica tutto, e gli iframe con indirizzo relativo vengono letti correttamente.
+
+### Aggiunto
+- **Dominio del player nella diagnosi**: se il player sta su un dominio non ancora supportato, Centro salute e cronologia lo indicano per nome ("Player su un dominio non supportato: …"); se nella pagina non c'è un player supportato, elencano gli host degli iframe trovati.
+- **Elenco unico dei domini del player** (`src/hosts.js`), con test.
+
+### Modificato
+- **Icona più grande**: il simbolo riempie di più il quadrato, soprattutto a 16 e 32 px (barra del browser).
+
 ## [1.5.0] - 2026-10-20
 
 ### Aggiunto

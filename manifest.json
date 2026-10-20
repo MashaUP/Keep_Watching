@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Keep_Watching",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Su StreamingCommunity passa da solo all'episodio successivo, salta intro e titoli, con timer, statistiche locali e aggiornamenti.",
   "permissions": [
     "storage",
@@ -73,7 +73,9 @@
     {
       "matches": [
         "*://vixcloud.co/embed/*",
-        "*://*.vixcloud.co/embed/*"
+        "*://*.vixcloud.co/embed/*",
+        "*://vixcloud.cc/embed/*",
+        "*://*.vixcloud.cc/embed/*"
       ],
       "js": [
         "src/defaults.js",
@@ -93,6 +95,7 @@
         "*://*/*/watch/*"
       ],
       "js": [
+        "src/hosts.js",
         "src/autoplay-permission.js",
         "src/cinema.js",
         "src/recovery.js",

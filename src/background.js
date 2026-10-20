@@ -17,7 +17,7 @@
  * Il service worker può essere fermato dal browser in qualsiasi momento: lo stato
  * va sempre tenuto in chrome.storage, mai in variabili globali.
  */
-importScripts('defaults.js', 'lib/stats.js', 'lib/health.js');
+importScripts('defaults.js', 'hosts.js', 'lib/stats.js', 'lib/health.js');
 
 const BADGE_GREEN = '#19AD79';
 const BADGE_GREY = '#5A6370';
@@ -272,10 +272,16 @@ async function verifyAll(tabId) {
   const player = reports.find((r) => r.frame === 'player');
   const checks = [];
 
-  // Riconoscimento del sito
+  // Riconoscimento del sito. La pagina intermedia …/iframe/… con lo script dell'estensione
+  // basta da sola a dire che la struttura è quella del sito, anche se la pagina principale
+  // non ha risposto in tempo.
   if (top && top.watchPage && (top.episodeFrame || top.playerFrame)) {
     checks.push(H.check('site', 'Sito riconosciuto', 'ok', `Pagina dell'episodio di StreamingCommunity su ${top.host}.`, { detail: 'verified' }));
-  } else if (top || mid) {
+  } else if (mid) {
+    checks.push(H.check('site', 'Sito riconosciuto', 'ok', top
+      ? `Pagina dell'episodio trovata (indirizzo della pagina principale: ${top.host}${top.path || ''}).`
+      : 'Pagina dell\'episodio trovata; la pagina principale non ha risposto in tempo.', { detail: 'verified' }));
+  } else if (top) {
     checks.push(H.check('site', 'Sito riconosciuto', 'na', 'Il percorso somiglia a quello del sito, ma manca l\'iframe dell\'episodio: struttura diversa da quella prevista.', { detail: 'error' }));
   } else if (player) {
     checks.push(H.check('site', 'Sito riconosciuto', 'check', 'Player aperto da solo, fuori dalla pagina del sito: il cambio episodio e la ricarica non sono disponibili.', { detail: 'unsupported' }));
@@ -286,13 +292,16 @@ async function verifyAll(tabId) {
   // Iframe dell'episodio e permesso di autoplay aggiunto dall'estensione
   if (mid) {
     if (!mid.playerFrame) {
-      checks.push(H.check('frame', 'Iframe dell\'episodio', 'na', mid.readyState === 'complete'
-        ? 'Nessun player vixcloud nella pagina dell\'episodio: pagina di errore o sito cambiato.'
-        : 'La pagina dell\'episodio è ancora in caricamento.', { detail: mid.readyState === 'complete' ? 'error' : 'idle' }));
+      const supported = KW_PLAYER_HOSTS.join(', ');
+      const text = mid.otherPlayer
+        ? `Il player è su ${mid.otherPlayer}, un dominio non ancora supportato (supportati: ${supported}): serve aggiornare l'estensione.`
+        : mid.readyState !== 'complete' ? 'La pagina dell\'episodio è ancora in caricamento.'
+          : `Nessun player supportato (${supported}) nella pagina dell'episodio${mid.frameHosts && mid.frameHosts.length ? `; iframe presenti: ${mid.frameHosts.join(', ')}` : ': pagina di errore o sito cambiato'}.`;
+      checks.push(H.check('frame', 'Iframe dell\'episodio', 'na', text, { detail: mid.readyState === 'complete' || mid.otherPlayer ? 'error' : 'idle' }));
     } else if (!mid.patched || !mid.allowAutoplay) {
       checks.push(H.check('frame', 'Iframe dell\'episodio', 'na', 'Il player non è stato ricaricato con il permesso di autoplay.', { detail: 'error' }));
     } else {
-      checks.push(H.check('frame', 'Iframe dell\'episodio', 'ok', 'Player trovato e caricato con il permesso di autoplay.', { detail: 'verified' }));
+      checks.push(H.check('frame', 'Iframe dell\'episodio', 'ok', `Player trovato su ${mid.playerHost || 'un host supportato'} e caricato con il permesso di autoplay.`, { detail: 'verified' }));
     }
   } else if (top) {
     checks.push(H.check('frame', 'Iframe dell\'episodio', 'check', 'La pagina dell\'episodio non ha risposto: forse è ancora in caricamento.', { detail: 'idle' }));
@@ -300,7 +309,7 @@ async function verifyAll(tabId) {
 
   // Verifiche del player
   if (player) checks.push(...player.checks);
-  else if (top || mid) checks.push(H.check('player', 'Player', 'na', 'Lo script del player non ha risposto: player non caricato o con un indirizzo diverso da vixcloud.co/embed.', { detail: 'error' }));
+  else if (top || mid) checks.push(H.check('player', 'Player', 'na', `Lo script del player non ha risposto: player non caricato o su un indirizzo diverso da ${KW_PLAYER_HOSTS.map((h) => `${h}/embed`).join(' o ')}.`, { detail: 'error' }));
 
   checks.push(await storageCheck());
 

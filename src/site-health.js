@@ -7,7 +7,9 @@
  * Riconoscimento: il dominio del sito cambia spesso e non viene usato. Una pagina è
  * riconosciuta solo se, oltre al percorso, contiene la struttura attesa:
  *   - pagina principale: un iframe verso …/iframe/…;
- *   - iframe intermedio: un iframe del player su vixcloud.co (unico host del player supportato).
+ *   - iframe intermedio: un iframe del player su uno degli host di KW_PLAYER_HOSTS (hosts.js).
+ * Se nella pagina c'è un player simile su un altro dominio (per esempio vixcloud.xyz) lo
+ * si segnala per nome: è il caso tipico in cui l'estensione va aggiornata.
  * Un sito qualsiasi con /watch/ nel percorso ma senza quel player non viene trattato come
  * StreamingCommunity: autoplay-permission.js tocca solo iframe di vixcloud.
  */
@@ -22,9 +24,18 @@
   const send = (msg) => chrome.runtime.sendMessage(msg).catch(() => {});
   const logEvent = (ev) => send({ type: 'kwEvent', ev: { at: Date.now(), ...ev } });
 
-  const playerFrame = () => [...document.querySelectorAll('iframe')]
-    .find((f) => /^(https?:)?\/\/([a-z0-9-]+\.)*vixcloud\.co(:\d+)?\//i.test(f.getAttribute('src') || '')) || null;
-  const episodeFrame = () => document.querySelector('iframe[src*="/iframe/"]');
+  const frames = () => [...document.querySelectorAll('iframe')];
+  // src come proprietà: indirizzo completo anche se nell'HTML è relativo.
+  const playerFrame = () => frames().find((f) => kwIsPlayerUrl(f.src || f.getAttribute('src'))) || null;
+  const otherPlayerHost = () => {
+    const f = frames().find((x) => kwLooksLikeOtherPlayer(x.src || x.getAttribute('src')));
+    return f ? kwHostOf(f.src) : null;
+  };
+  const episodeFrame = () => frames().find((f) => {
+    try { return new URL(f.src, location.href).pathname.includes('/iframe/'); } catch (e) { return false; }
+  }) || null;
+  // Solo gli host (mai indirizzi completi): bastano per capire dove sta il player.
+  const frameHosts = () => [...new Set(frames().map((f) => kwHostOf(f.src)).filter(Boolean))].slice(0, 6);
 
   function report() {
     if (IS_TOP) {
@@ -35,7 +46,10 @@
         watchPage: location.pathname.includes('/watch/'),
         episodeFrame: Boolean(ep),
         // Alcune versioni del sito potrebbero mettere il player direttamente nella pagina.
-        playerFrame: Boolean(playerFrame())
+        playerFrame: Boolean(playerFrame()),
+        otherPlayer: otherPlayerHost(),
+        path: location.pathname.slice(0, 80),
+        frameHosts: frameHosts()
       };
     }
     const pf = playerFrame();
@@ -46,6 +60,9 @@
       playerFrame: Boolean(pf),
       patched: src.includes('kw_autoplay=1'),
       allowAutoplay: /(^|;)\s*autoplay/.test(allow),
+      playerHost: pf ? kwHostOf(pf.src) : null,
+      otherPlayer: otherPlayerHost(),
+      frameHosts: frameHosts(),
       readyState: document.readyState
     };
   }
@@ -59,9 +76,14 @@
   if (IS_MID) {
     setTimeout(() => {
       if (playerFrame()) return;
-      logEvent({ cat: 'site', level: 'warn', fn: 'Riconoscimento del sito', msg: 'Pagina dell\'episodio senza il player vixcloud',
-        result: 'Pagina di errore o di manutenzione, oppure il sito ha cambiato struttura' });
-      send({ type: 'kwHealth', site: { at: Date.now(), playerMissing: true } });
+      const other = otherPlayerHost();
+      const hosts = frameHosts();
+      logEvent(other
+        ? { cat: 'site', level: 'error', fn: 'Riconoscimento del sito', msg: `Player su un dominio non supportato: ${other}`,
+            result: `Supportati: ${KW_PLAYER_HOSTS.join(', ')}. Serve aggiornare l'estensione` }
+        : { cat: 'site', level: 'warn', fn: 'Riconoscimento del sito', msg: 'Pagina dell\'episodio senza un player supportato',
+            result: hosts.length ? `Iframe presenti: ${hosts.join(', ')}` : 'Nessun iframe: pagina di errore o di manutenzione, oppure il sito ha cambiato struttura' });
+      send({ type: 'kwHealth', site: { at: Date.now(), playerMissing: true, otherPlayer: other, frameHosts: hosts } });
     }, PLAYER_WAIT_MS);
   }
 
