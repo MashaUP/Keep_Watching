@@ -32,15 +32,15 @@ async function updateBadge() {
   const s = kwSanitize(raw);
   let text = '';
   let color = BADGE_GREEN;
-  let title = 'Keep_Watching: attivo';
+  let title = 'Keep Watching: attivo';
 
   if (!s.enabled) {
     text = 'OFF';
     color = BADGE_GREY;
-    title = 'Keep_Watching: sospeso';
+    title = 'Keep Watching: sospeso';
   } else if (s.stopAfter > 0 && raw.streak > 0 && Date.now() - raw.lastAutoAt < KW_STREAK_RESET_MS) {
     text = `${raw.streak}/${s.stopAfter}`;
-    title = `Keep_Watching: ${raw.streak} episodi su ${s.stopAfter} prima di chiedere`;
+    title = `Keep Watching: ${raw.streak} episodi su ${s.stopAfter} prima di chiedere`;
   }
 
   await chrome.action.setBadgeText({ text });
@@ -231,7 +231,10 @@ chrome.tabs.onRemoved.addListener((tabId) => { chrome.storage.session.remove(hea
 // chrome.tabs.sendMessage arriverebbe solo la prima risposta, e leggere l'elenco dei frame
 // richiederebbe il permesso webNavigation. Si raccolgono le risposte per poco più di un secondo.
 
-const REPORT_WAIT_MS = 1500;
+// Si aspetta finché hanno risposto pagina principale, iframe dell'episodio e player, oppure
+// al massimo REPORT_MAX_MS: con molte estensioni attive il sito può rispondere lentamente.
+const REPORT_MIN_MS = 500;
+const REPORT_MAX_MS = 3000;
 const pendingChecks = new Map();
 
 async function storageCheck() {
@@ -263,7 +266,14 @@ async function verifyAll(tabId) {
   } catch (e) {
     reached = false; // nessuno script dell'estensione in questa scheda
   }
-  if (reached) await new Promise((r) => setTimeout(r, REPORT_WAIT_MS));
+  if (reached) {
+    const started = Date.now();
+    const has = (f) => reports.some((r) => r.frame === f);
+    while (Date.now() - started < REPORT_MAX_MS) {
+      await new Promise((r) => setTimeout(r, 100));
+      if (Date.now() - started >= REPORT_MIN_MS && has('site-top') && has('site-iframe') && has('player')) break;
+    }
+  }
   pendingChecks.delete(reqId);
 
   const H = KWHealth;
@@ -277,12 +287,13 @@ async function verifyAll(tabId) {
   // non ha risposto in tempo.
   if (top && top.watchPage && (top.episodeFrame || top.playerFrame)) {
     checks.push(H.check('site', 'Sito riconosciuto', 'ok', `Pagina dell'episodio di StreamingCommunity su ${top.host}.`, { detail: 'verified' }));
-  } else if (mid) {
-    checks.push(H.check('site', 'Sito riconosciuto', 'ok', top
-      ? `Pagina dell'episodio trovata (indirizzo della pagina principale: ${top.host}${top.path || ''}).`
-      : 'Pagina dell\'episodio trovata; la pagina principale non ha risposto in tempo.', { detail: 'verified' }));
+  } else if (mid || (top && player)) {
+    // L'iframe dell'episodio (o il player) ha risposto: la struttura è quella del sito anche se
+    // la pagina principale non ha trovato l'iframe a modo suo o ha risposto in ritardo.
+    checks.push(H.check('site', 'Sito riconosciuto', 'ok', `Pagina dell'episodio di StreamingCommunity${top ? ` su ${top.host}` : ''}.`, { detail: 'verified' }));
   } else if (top) {
-    checks.push(H.check('site', 'Sito riconosciuto', 'na', 'Il percorso somiglia a quello del sito, ma manca l\'iframe dell\'episodio: struttura diversa da quella prevista.', { detail: 'error' }));
+    const seen = top.frameHosts && top.frameHosts.length ? `iframe presenti: ${top.frameHosts.join(', ')}` : 'nessun iframe nella pagina';
+    checks.push(H.check('site', 'Sito riconosciuto', 'na', `Pagina ${top.path || '/watch/'} senza l'iframe dell'episodio (${seen}): pagina ancora in caricamento o struttura diversa da quella prevista.`, { detail: top.watchPage ? 'error' : 'unsupported' }));
   } else if (player) {
     checks.push(H.check('site', 'Sito riconosciuto', 'check', 'Player aperto da solo, fuori dalla pagina del sito: il cambio episodio e la ricarica non sono disponibili.', { detail: 'unsupported' }));
   } else {
@@ -321,7 +332,8 @@ async function verifyAll(tabId) {
     : H.check('errors', 'Errori recenti', 'ok', 'Nessun errore nell\'ultima ora.', { detail: 'verified' }));
 
   const summary = H.summarize(checks);
-  const result = { at: Date.now(), tabId, summary, checks, state: player ? player.state : null };
+  const result = { at: Date.now(), tabId, summary, checks, state: player ? player.state : null,
+    version: chrome.runtime.getManifest().version, frames: reports.map((r) => r.frame) };
   await chrome.storage.local.set({ healthLast: result });
   await saveHealth(tabId, { lastCheck: { at: result.at, summary } }, { onlyIfExists: true });
   await logEvent({ cat: 'health', level: summary.overall === 'error' ? 'warn' : 'info', fn: 'Verifica tutto',

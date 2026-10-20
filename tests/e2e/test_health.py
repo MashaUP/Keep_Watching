@@ -64,6 +64,7 @@ async def main():
         check('In riproduzione' in card and 'Brothers' in card and 'StreamingCommunity' in card, f'Panoramica: stato della scheda con il player ({card})')
         await pg.click('#tabStatus button:has-text("Verifica tutto")')
         await wait_for(lambda: pg.is_visible('#hcSummary'), 6)
+        await wait_for(lambda: pg.is_enabled('#verifyAll'), 6)
         items = await pg.eval_on_selector_all('#hcList .hc-item', 'l => l.map(x => x.querySelector(".hc-label").textContent + "=" + x.querySelector(".hc-status").textContent)')
         check(len(items) >= 10 and 'Sito riconosciuto=Funzionante' in items, f'Centro salute: {len(items)} verifiche mostrate')
         check('Funzionante' in await pg.text_content('#hcSummary'), 'riepilogo con i conteggi')
@@ -80,7 +81,8 @@ async def main():
         await pg.click('#logClear')
         await pg.click('#logClearGo')
         await asyncio.sleep(0.4)
-        check(len(await k.events()) == 0, 'cronologia cancellata (con conferma)')
+        left = await k.event_msgs()
+        check(len(left) == 0, f'cronologia cancellata (con conferma) {left}')
         check((await k.get('countdown'))['countdown'] == 0, 'cancellare la cronologia non tocca le impostazioni')
 
     print('Player su vixcloud.cc (dominio usato dal sito da ottobre 2026)')

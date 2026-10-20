@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Keep_Watching",
-  "version": "1.5.1",
+  "name": "Keep Watching",
+  "version": "1.5.2",
   "description": "Su StreamingCommunity passa da solo all'episodio successivo, salta intro e titoli, con timer, statistiche locali e aggiornamenti.",
   "permissions": [
     "storage",
@@ -15,7 +15,7 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "Keep_Watching",
+    "default_title": "Keep Watching",
     "default_popup": "src/popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -30,7 +30,7 @@
       "suggested_key": {
         "default": "Alt+Shift+K"
       },
-      "description": "Attiva o sospendi Keep_Watching"
+      "description": "Attiva o sospendi Keep Watching"
     },
     "quick-skip": {
       "suggested_key": {

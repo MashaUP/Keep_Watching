@@ -227,7 +227,7 @@ function kwProfileDiff(profileId, settings) {
 // serie solo se non sono già usate: una combinazione vuota va segnalata come non assegnata.
 
 const KW_COMMANDS = [
-  { name: 'toggle-enabled', label: 'Attiva o sospendi Keep_Watching', suggested: 'Alt+Shift+K' },
+  { name: 'toggle-enabled', label: 'Attiva o sospendi Keep Watching', suggested: 'Alt+Shift+K' },
   { name: 'quick-skip', label: 'Salto avanti', suggested: 'Alt+Shift+Right' },
   { name: 'skip-intro', label: 'Salta intro', suggested: 'Alt+Shift+S' },
   { name: 'show-shortcuts', label: 'Guida alle scorciatoie', suggested: 'Alt+Shift+H' },

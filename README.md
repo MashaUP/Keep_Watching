@@ -2,7 +2,9 @@
 
 Estensione per Brave e Chrome che su StreamingCommunity passa da sola all'episodio successivo quando quello corrente finisce, e lo fa partire con l'audio. Salta l'intro e i titoli di coda serie per serie, ha un timer di spegnimento, fa ripartire lo streaming quando si blocca e tiene statistiche di visione solo sul tuo computer. Quando qualcosa non va, il **Centro salute** dice cosa funziona davvero e la **Cronologia** cosa è successo.
 
-Versione 1.5.1
+Versione 1.5.2
+
+Nel browser l'estensione si chiama **Keep Watching**; repository, cartella e zip si chiamano `Keep_Watching`.
 
 > **Importante:** il browser lascia partire l'audio da solo solo dopo un tuo click sulla pagina. Apri l'episodio e premi play una volta: da lì in poi fa tutto l'estensione.
 
@@ -51,7 +53,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 ## 1. Carica il progetto su GitHub
 
 1. Crea un nuovo repository, per esempio `Keep_Watching`. Deve essere **pubblico** perché **Cerca aggiornamento** funzioni: GitHub risponde senza accesso solo per i repository pubblici. Se lo vuoi privato l'estensione funziona lo stesso, ma il controllo degli aggiornamenti dirà "Repository non trovato o privato".
-2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.5.1.zip` e le cartelle devono stare al primo livello.
+2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.5.2.zip` e le cartelle devono stare al primo livello.
 
 `version.json` e lo zip nella radice sono quello che legge **Cerca aggiornamento**. Se un giorno pubblichi le versioni come **release** di GitHub (con lo zip allegato), l'estensione usa quelle.
 
@@ -59,7 +61,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 
 ### 2.1 Estrai lo zip
 
-1. Scarica `Keep_Watching-1.5.1.zip` (dal repository, oppure dalla cartella del progetto).
+1. Scarica `Keep_Watching-1.5.2.zip` (dal repository, oppure dalla cartella del progetto).
 2. Estrailo con **Estrai qui**: ottieni la cartella `Keep_Watching`, con dentro `manifest.json`.
 3. Mettila in un posto dove resta: il browser carica l'estensione da lì ogni volta. Se la cancelli, l'estensione smette di funzionare.
 
@@ -397,7 +399,7 @@ Il file contiene solo gli eventi: niente cookie, token o indirizzi completi. Con
 ## Struttura dei file
 
 ```
-Keep_Watching-1.5.1.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
+Keep_Watching-1.5.2.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
 version.json                 ultima versione pubblicata, letta da "Cerca aggiornamento"
 manifest.json                configurazione dell'estensione (Manifest V3)
 rules.json                   regola di rete: blocca il primo caricamento del player senza permesso di autoplay

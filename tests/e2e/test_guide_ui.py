@@ -16,7 +16,7 @@ async def main():
         check(res == 'sent' and g and len(g) == 7, f'guida aperta con i 7 comandi dell\'estensione ({len(g or [])})')
         for row in g:
             print('     ', row)
-        check(any(r.startswith('Attiva o sospendi Keep_Watching = Alt+Shift+K → Attiva') for r in g), 'Alt+Shift+K invariata e attiva')
+        check(any(r.startswith('Attiva o sospendi Keep Watching = Alt+Shift+K → Attiva') for r in g), 'Alt+Shift+K invariata e attiva')
         check(any(r.startswith('Salta intro') and 'intro non segnata' in r for r in g), 'Salta intro segnalata come non disponibile senza intro segnata')
         check(any(r.startswith('Segna l\'inizio dei titoli = Non assegnata') for r in g), 'comandi senza tasti indicati come non assegnati')
         await k.player().evaluate("document.body.focus()")

@@ -24,9 +24,9 @@ PLAY = (247, 247, 252)
 
 # Varianti: (spessore anello, raggio anello, scala del play, scala della freccia), in frazioni di S.
 VARIANTS = {
-    "large": (0.1, 0.315, 1.12, 1.0),
+    "large": (0.115, 0.34, 1.3, 0.95),
     # Barra del browser (16 e 32 px): simbolo che riempie quasi tutto il quadrato.
-    "small": (0.15, 0.32, 1.32, 1.05),
+    "small": (0.175, 0.355, 1.5, 0.85),
 }
 
 
@@ -59,7 +59,7 @@ def draw(variant):
     im = background()
     ring = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(ring)
-    cx, cy = S * 0.48, S * 0.53
+    cx, cy = S * 0.47, S * 0.535
     r = S * radius
     w = S * stroke
 

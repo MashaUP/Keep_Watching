@@ -67,7 +67,7 @@ function kwCreateToolbar(getContainer, getSettings) {
       bar = document.createElement('div');
       bar.className = 'bar';
       bar.setAttribute('role', 'toolbar');
-      bar.setAttribute('aria-label', 'Keep_Watching');
+      bar.setAttribute('aria-label', 'Keep Watching');
       bar.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (btn && handlers[btn.dataset.id]) handlers[btn.dataset.id]();

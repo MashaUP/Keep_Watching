@@ -3,6 +3,16 @@
 Tutte le modifiche rilevanti del progetto sono elencate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e le versioni seguono il [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.2] - 2026-10-20
+
+### Corretto
+- **Verifica tutto, "Sito riconosciuto"**: poteva risultare in errore ("manca l'iframe dell'episodio") anche con tutto funzionante, se l'iframe dell'episodio rispondeva in ritardo. Ora si aspettano le risposte di pagina, iframe e player (fino a 3 secondi) e basta che risponda l'iframe dell'episodio o il player; se l'errore è vero, il testo dice quali iframe ci sono nella pagina.
+- I risultati di Verifica tutto fatti con una versione precedente non vengono più mostrati: dopo un aggiornamento la verifica va rifatta.
+
+### Modificato
+- **Nome visualizzato "Keep Watching"** (senza trattino basso) nel browser, nel menu, nelle notifiche e sul player. Repository, cartella e zip restano `Keep_Watching`.
+- **Icona ancora più grande**: il simbolo occupa quasi tutto il quadrato.
+
 ## [1.5.1] - 2026-10-20
 
 ### Corretto

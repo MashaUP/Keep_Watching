@@ -289,9 +289,9 @@
     try { data = typeof text === 'string' ? JSON.parse(text.replace(/^﻿/, '')) : text; }
     catch (e) { return { ok: false, error: 'Il file non è un JSON valido.' }; }
     if (!data || typeof data !== 'object') return { ok: false, error: 'Il file è vuoto.' };
-    if (data.schema !== EXPORT_SCHEMA) return { ok: false, error: 'Non è un file di statistiche di Keep_Watching.' };
+    if (data.schema !== EXPORT_SCHEMA) return { ok: false, error: 'Non è un file di statistiche di Keep Watching.' };
     if (!Number.isInteger(data.version) || data.version < 1) return { ok: false, error: 'Versione del file non valida.' };
-    if (data.version > EXPORT_VERSION) return { ok: false, error: `Il file viene da una versione più recente (${data.version}): aggiorna Keep_Watching.` };
+    if (data.version > EXPORT_VERSION) return { ok: false, error: `Il file viene da una versione più recente (${data.version}): aggiorna Keep Watching.` };
     if (!Array.isArray(data.days)) return { ok: false, error: 'Mancano i dati giornalieri.' };
     if (data.days.length > 5000) return { ok: false, error: 'Troppi giorni nel file.' };
 

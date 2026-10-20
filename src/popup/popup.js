@@ -643,7 +643,7 @@
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) return importResult(false, 'File troppo grande per essere un\'esportazione di Keep_Watching.');
+    if (file.size > 2 * 1024 * 1024) return importResult(false, 'File troppo grande per essere un\'esportazione di Keep Watching.');
     const text = await file.text();
     const parsed = KWStats.parseImport(text);
     if (!parsed.ok) return importResult(false, `File non importato: ${parsed.error}`);
@@ -966,6 +966,9 @@
     verifying = true;
     $('verifyAll').disabled = true;
     $('verifyAll').lastChild.textContent = 'Verifica in corso…';
+    // Il risultato precedente sparisce: non deve sembrare quello nuovo.
+    $('hcSummary').hidden = true;
+    $('hcList').replaceChildren();
     await loadTabHealth();
     const tabId = tabHealth && tabIsOther ? tabHealth.tabId : activeTabId;
     const res = await chrome.runtime.sendMessage({ type: 'kwVerifyAll', tabId }).catch((e) => ({ ok: false, error: e.message }));
@@ -989,8 +992,11 @@
   function renderHealthResult(fresh) {
     const r = X.healthLast;
     // Il risultato vale per la scheda in cui è stato fatto.
-    const relevant = r && (fresh || (tabHealth && r.tabId === tabHealth.tabId) || r.tabId === activeTabId);
-    $('hcLast').textContent = r ? `Ultimo controllo: ${fmtDateTime(r.at)}` : 'Mai eseguita';
+    // Un risultato di una versione precedente non vale più (per esempio dopo un aggiornamento
+    // che corregge proprio una verifica): si chiede di rifarla.
+    const sameVersion = r && r.version === VERSION;
+    const relevant = r && sameVersion && (fresh || (tabHealth && r.tabId === tabHealth.tabId) || r.tabId === activeTabId);
+    $('hcLast').textContent = !r ? 'Mai eseguita' : sameVersion ? `Ultimo controllo: ${fmtDateTime(r.at)}` : 'Da rifare dopo l\'aggiornamento';
     if (!relevant) {
       $('hcSummary').hidden = true;
       $('hcList').replaceChildren();

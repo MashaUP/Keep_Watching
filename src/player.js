@@ -303,7 +303,7 @@
     if (document.hidden && settings.notifyEnd) {
       send({
         type: 'notify',
-        title: 'Keep_Watching: limite raggiunto',
+        title: 'Keep Watching: limite raggiunto',
         message: `Hai visto ${episodes(n)} di fila${EPISODE.title ? ` di ${EPISODE.title}` : ''}. Torna sulla scheda per continuare.`
       });
     }
@@ -361,7 +361,7 @@
       log(`ATTENZIONE: c'è un episodio successivo ma il pulsante è ${why}. Controlla NEXT_SELECTOR (docs/MANUTENZIONE.md).`);
       send({
         type: 'notify',
-        title: 'Keep_Watching: pulsante non trovato',
+        title: 'Keep Watching: pulsante non trovato',
         message: 'C\'è un episodio successivo ma il pulsante non è stato trovato: il sito potrebbe essere cambiato.'
       });
       return;
@@ -502,7 +502,7 @@
       ]
     });
     if (document.hidden) {
-      send({ type: 'notify', title: 'Keep_Watching: cambio episodio non riuscito',
+      send({ type: 'notify', title: 'Keep Watching: cambio episodio non riuscito',
         message: 'Il clic su "prossimo episodio" non ha avuto effetto. Torna sulla scheda per continuare.' });
     }
   }
@@ -822,7 +822,7 @@
     const v = findVideo();
     const t = v ? v.currentTime : 0;
     const known = v && isFinite(v.duration) && v.duration > 0;
-    const off = 'Keep_Watching è sospeso';
+    const off = 'Keep Watching è sospeso';
     const conf = seriesConf();
     return {
       'toggle-enabled': true,
@@ -1092,7 +1092,7 @@
       showToast('recovery', 'Lo streaming non riparte: prova a ricaricare la pagina', { tone: 'warn', ms: 8000 });
       send({
         type: 'notify',
-        title: 'Keep_Watching: streaming bloccato',
+        title: 'Keep Watching: streaming bloccato',
         message: 'Lo streaming non riparte nemmeno dopo la ricarica. Prova a ricaricare la pagina.'
       });
       return;
@@ -1117,7 +1117,7 @@
     machine.send('manual-needed');
     recovery('Ricarica dell\'episodio', 'impossibile: la pagina del sito non ha risposto (percorso cambiato?). Ricarica la pagina a mano', 'error');
     showToast('recovery', 'Lo streaming non riparte: ricarica la pagina', { tone: 'warn', ms: 8000 });
-    send({ type: 'notify', title: 'Keep_Watching: streaming bloccato',
+    send({ type: 'notify', title: 'Keep Watching: streaming bloccato',
       message: 'Non è stato possibile ricaricare l\'episodio: ricarica la pagina.' });
   }
 
@@ -1376,7 +1376,7 @@
     // Prossimo episodio
     const nb = nextButtonState();
     if (!settings.enabled || !settings.autoNext) {
-      checks.push(H.check('next', 'Prossimo episodio automatico', 'na', !settings.enabled ? 'Keep_Watching è sospeso.' : 'Cambio automatico spento (anche dal profilo Manuale).', { detail: 'off' }));
+      checks.push(H.check('next', 'Prossimo episodio automatico', 'na', !settings.enabled ? 'Keep Watching è sospeso.' : 'Cambio automatico spento (anche dal profilo Manuale).', { detail: 'off' }));
     } else if (nb.reason === 'none') {
       checks.push(H.check('next', 'Prossimo episodio automatico', 'na', 'Ultimo episodio disponibile: non c\'è un successivo.', { detail: 'idle' }));
     } else if (!nb.btn) {

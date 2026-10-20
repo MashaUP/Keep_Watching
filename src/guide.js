@@ -69,8 +69,8 @@ function kwCreateGuide(getContainer, getSettings, actions) {
     const win = document.createElement('div');
     win.className = 'win';
     win.setAttribute('role', 'dialog');
-    win.setAttribute('aria-label', 'Scorciatoie di Keep_Watching');
-    win.innerHTML = `<h2>Scorciatoie di Keep_Watching</h2>
+    win.setAttribute('aria-label', 'Scorciatoie di Keep Watching');
+    win.innerHTML = `<h2>Scorciatoie di Keep Watching</h2>
       <p class="sub">Funzionano con il focus sul player o sulla pagina del sito, non mentre scrivi in un campo di testo.</p>
       <ul></ul>
       <p class="note">Il browser segnala solo le scorciatoie che non ha potuto assegnare. Eventuali tasti usati dal sito o da altre estensioni non sono rilevabili da qui.</p>
