@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Keep_Watching",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Su StreamingCommunity passa da solo all'episodio successivo, salta intro e titoli, con timer, statistiche locali e aggiornamenti.",
   "permissions": [
     "storage",
@@ -78,6 +78,7 @@
       "js": [
         "src/defaults.js",
         "src/lib/stats.js",
+        "src/lib/health.js",
         "src/panel.js",
         "src/toolbar.js",
         "src/guide.js",
@@ -94,7 +95,8 @@
       "js": [
         "src/autoplay-permission.js",
         "src/cinema.js",
-        "src/recovery.js"
+        "src/recovery.js",
+        "src/site-health.js"
       ],
       "all_frames": true,
       "run_at": "document_start"

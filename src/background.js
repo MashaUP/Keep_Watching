@@ -7,12 +7,17 @@
  *   - notifiche sul desktop (richieste da player.js);
  *   - schermo intero della finestra tra un episodio e l'altro ("cinema");
  *   - statistiche di visione: unico punto che le scrive, una modifica alla volta;
- *   - migrazione delle impostazioni e novità dopo un aggiornamento.
+ *   - migrazione delle impostazioni e novità dopo un aggiornamento;
+ *   - cronologia degli eventi diagnostici (unico punto che la scrive) e stato per scheda;
+ *   - "Verifica tutto": raccoglie le risposte di tutti i frame della scheda.
+ *
+ * Messaggi: quelli che cambiano dati importanti (azzeramenti, importazioni, verifiche)
+ * sono accettati solo dalle pagine dell'estensione, non dagli script nelle pagine del sito.
  *
  * Il service worker può essere fermato dal browser in qualsiasi momento: lo stato
  * va sempre tenuto in chrome.storage, mai in variabili globali.
  */
-importScripts('defaults.js', 'lib/stats.js');
+importScripts('defaults.js', 'lib/stats.js', 'lib/health.js');
 
 const BADGE_GREEN = '#19AD79';
 const BADGE_GREY = '#5A6370';
@@ -186,9 +191,157 @@ async function handleStats(msg, sender) {
   if (msg.event) withStats((st) => { KWStats.addEvent(st, msg.event); });
 }
 
+// ---------- Cronologia eventi ----------
+// Come per le statistiche: una sola coda di scritture, dati ripuliti e limitati.
+
+let logChain = Promise.resolve();
+
+function withLog(change) {
+  const job = logChain.then(async () => {
+    const { eventLog } = await chrome.storage.local.get({ eventLog: null });
+    const log = KWHealth.validLog(eventLog);
+    const result = change(log) || {};
+    await chrome.storage.local.set({ eventLog: result.log || log });
+    return { ok: true };
+  });
+  logChain = job.catch((e) => console.warn('[Keep_Watching] Cronologia non salvata:', e && e.message));
+  return job;
+}
+
+const logEvent = (ev) => withLog((log) => { KWHealth.addEvent(log, ev); });
+
+// ---------- Stato per scheda (Centro salute, Panoramica) ----------
+// In chrome.storage.session: sparisce alla chiusura del browser, sopravvive al service
+// worker fermato e alla chiusura del popup.
+
+const healthKey = (tabId) => `health:${tabId}`;
+
+async function saveHealth(tabId, part, { onlyIfExists = false } = {}) {
+  const key = healthKey(tabId);
+  const { [key]: prev } = await chrome.storage.session.get(key);
+  // Un player che si chiude dopo che la scheda ha lasciato il sito non deve ricreare lo stato.
+  if (onlyIfExists && !prev) return;
+  await chrome.storage.session.set({ [key]: { ...(prev || {}), ...part, tabId, at: Date.now() } });
+}
+
+chrome.tabs.onRemoved.addListener((tabId) => { chrome.storage.session.remove(healthKey(tabId)); });
+
+// ---------- Verifica tutto ----------
+// Ogni frame della scheda risponde con un messaggio a parte (kwHealthReport): con
+// chrome.tabs.sendMessage arriverebbe solo la prima risposta, e leggere l'elenco dei frame
+// richiederebbe il permesso webNavigation. Si raccolgono le risposte per poco più di un secondo.
+
+const REPORT_WAIT_MS = 1500;
+const pendingChecks = new Map();
+
+async function storageCheck() {
+  const probe = { at: Date.now(), n: Math.random() };
+  try {
+    await chrome.storage.local.set({ kwProbe: probe });
+    const { kwProbe } = await chrome.storage.local.get('kwProbe');
+    await chrome.storage.local.remove('kwProbe');
+    await chrome.storage.session.set({ kwProbe: probe });
+    const { kwProbe: p2 } = await chrome.storage.session.get('kwProbe');
+    await chrome.storage.session.remove('kwProbe');
+    const ok = kwProbe && kwProbe.n === probe.n && p2 && p2.n === probe.n;
+    return ok
+      ? KWHealth.check('storage', 'Memoria dell\'estensione', 'ok', 'Scrittura e lettura riuscite (impostazioni e stato della scheda).', { detail: 'verified' })
+      : KWHealth.check('storage', 'Memoria dell\'estensione', 'na', 'I dati scritti non tornano uguali in lettura.', { detail: 'error' });
+  } catch (e) {
+    return KWHealth.check('storage', 'Memoria dell\'estensione', 'na', `Errore della memoria del browser: ${e && e.message}`, { detail: 'error' });
+  }
+}
+
+/** Raccoglie le risposte dei frame della scheda e le trasforma nell'elenco delle verifiche. */
+async function verifyAll(tabId) {
+  const reqId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const reports = [];
+  pendingChecks.set(reqId, { tabId, reports });
+  let reached = true;
+  try {
+    await chrome.tabs.sendMessage(tabId, { type: 'kwHealthCheck', reqId });
+  } catch (e) {
+    reached = false; // nessuno script dell'estensione in questa scheda
+  }
+  if (reached) await new Promise((r) => setTimeout(r, REPORT_WAIT_MS));
+  pendingChecks.delete(reqId);
+
+  const H = KWHealth;
+  const top = reports.find((r) => r.frame === 'site-top');
+  const mid = reports.find((r) => r.frame === 'site-iframe');
+  const player = reports.find((r) => r.frame === 'player');
+  const checks = [];
+
+  // Riconoscimento del sito
+  if (top && top.watchPage && (top.episodeFrame || top.playerFrame)) {
+    checks.push(H.check('site', 'Sito riconosciuto', 'ok', `Pagina dell'episodio di StreamingCommunity su ${top.host}.`, { detail: 'verified' }));
+  } else if (top || mid) {
+    checks.push(H.check('site', 'Sito riconosciuto', 'na', 'Il percorso somiglia a quello del sito, ma manca l\'iframe dell\'episodio: struttura diversa da quella prevista.', { detail: 'error' }));
+  } else if (player) {
+    checks.push(H.check('site', 'Sito riconosciuto', 'check', 'Player aperto da solo, fuori dalla pagina del sito: il cambio episodio e la ricarica non sono disponibili.', { detail: 'unsupported' }));
+  } else {
+    checks.push(H.check('site', 'Sito riconosciuto', 'na', 'Questa scheda non è una pagina di un episodio di StreamingCommunity.', { detail: 'unsupported' }));
+  }
+
+  // Iframe dell'episodio e permesso di autoplay aggiunto dall'estensione
+  if (mid) {
+    if (!mid.playerFrame) {
+      checks.push(H.check('frame', 'Iframe dell\'episodio', 'na', mid.readyState === 'complete'
+        ? 'Nessun player vixcloud nella pagina dell\'episodio: pagina di errore o sito cambiato.'
+        : 'La pagina dell\'episodio è ancora in caricamento.', { detail: mid.readyState === 'complete' ? 'error' : 'idle' }));
+    } else if (!mid.patched || !mid.allowAutoplay) {
+      checks.push(H.check('frame', 'Iframe dell\'episodio', 'na', 'Il player non è stato ricaricato con il permesso di autoplay.', { detail: 'error' }));
+    } else {
+      checks.push(H.check('frame', 'Iframe dell\'episodio', 'ok', 'Player trovato e caricato con il permesso di autoplay.', { detail: 'verified' }));
+    }
+  } else if (top) {
+    checks.push(H.check('frame', 'Iframe dell\'episodio', 'check', 'La pagina dell\'episodio non ha risposto: forse è ancora in caricamento.', { detail: 'idle' }));
+  }
+
+  // Verifiche del player
+  if (player) checks.push(...player.checks);
+  else if (top || mid) checks.push(H.check('player', 'Player', 'na', 'Lo script del player non ha risposto: player non caricato o con un indirizzo diverso da vixcloud.co/embed.', { detail: 'error' }));
+
+  checks.push(await storageCheck());
+
+  // Errori recenti nella cronologia (ultima ora)
+  const { eventLog } = await chrome.storage.local.get({ eventLog: null });
+  const recent = H.validLog(eventLog).events.filter((e) => e.level === 'error' && Date.now() - (e.lastAt || e.at) < 60 * 60 * 1000);
+  checks.push(recent.length
+    ? H.check('errors', 'Errori recenti', 'check', `${recent.length} ${recent.length === 1 ? 'errore' : 'errori'} nell'ultima ora: l'ultimo è "${recent[recent.length - 1].msg}". Dettagli in Cronologia.`, { detail: 'error' })
+    : H.check('errors', 'Errori recenti', 'ok', 'Nessun errore nell\'ultima ora.', { detail: 'verified' }));
+
+  const summary = H.summarize(checks);
+  const result = { at: Date.now(), tabId, summary, checks, state: player ? player.state : null };
+  await chrome.storage.local.set({ healthLast: result });
+  await saveHealth(tabId, { lastCheck: { at: result.at, summary } }, { onlyIfExists: true });
+  await logEvent({ cat: 'health', level: summary.overall === 'error' ? 'warn' : 'info', fn: 'Verifica tutto',
+    msg: `Verifica tutto: ${summary.ok} funzionanti, ${summary.check} da verificare, ${summary.na} non disponibili` });
+  return { ok: true, result };
+}
+
 // ---------- Messaggi ----------
 
+// Pagine dell'estensione (popup, menu in scheda): le sole che possono chiedere operazioni
+// che cancellano o sostituiscono dati, o che leggono lo stato di altre schede.
+const fromExtensionPage = (sender) => sender && sender.id === chrome.runtime.id &&
+  typeof sender.url === 'string' && sender.url.startsWith(chrome.runtime.getURL(''));
+const PRIVILEGED = ['kwStatsReset', 'kwStatsImport', 'kwVerifyAll', 'kwLogClear', 'kwShowGuide'];
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (!sender || sender.id !== chrome.runtime.id) return false;
+  // Risposte di "Verifica tutto": raccolte qui, senza risposta.
+  if (msg && msg.type === 'kwHealthReport') {
+    const pending = pendingChecks.get(msg.reqId);
+    if (pending && sender.tab && sender.tab.id === pending.tabId && msg.report && typeof msg.report === 'object') {
+      pending.reports.push(msg.report);
+    }
+    return false;
+  }
+  if (msg && PRIVILEGED.includes(msg.type) && !fromExtensionPage(sender)) {
+    sendResponse({ ok: false, error: 'non consentito da questa pagina' });
+    return false;
+  }
   (async () => {
     switch (msg && msg.type) {
       case 'notify':
@@ -200,9 +353,35 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       case 'exitCinema':
         await exitCinema();
         return { ok: true };
-      case 'reloadEpisode':
+      case 'reloadEpisode': {
         // Inoltrato a tutti i frame della scheda: risponde solo l'iframe intermedio (recovery.js).
-        if (sender.tab) await chrome.tabs.sendMessage(sender.tab.id, { type: 'kwReloadEpisode', minute: msg.minute });
+        // handled: false se nessuna pagina del sito l'ha raccolto (il player lo dice all'utente).
+        if (!sender.tab) return { ok: false, handled: false };
+        try {
+          const res = await chrome.tabs.sendMessage(sender.tab.id, { type: 'kwReloadEpisode', minute: msg.minute });
+          return { ok: true, handled: Boolean(res && res.handled) };
+        } catch (e) {
+          return { ok: true, handled: false };
+        }
+      }
+      case 'kwEvent':
+        await logEvent(msg.ev);
+        return { ok: true };
+      case 'kwHealth':
+        if (sender.tab && msg.reset === true && sender.frameId === 0) {
+          await chrome.storage.session.remove(healthKey(sender.tab.id));
+        } else if (sender.tab) {
+          const part = {};
+          if (msg.player && typeof msg.player === 'object') part.player = msg.player;
+          if (msg.site && typeof msg.site === 'object') part.site = msg.site;
+          await saveHealth(sender.tab.id, part, { onlyIfExists: Boolean(part.player && part.player.state === 'closed') });
+        }
+        return { ok: true };
+      case 'kwVerifyAll':
+        if (!Number.isInteger(msg.tabId)) return { ok: false, error: 'scheda non indicata' };
+        return verifyAll(msg.tabId);
+      case 'kwLogClear':
+        await withLog(() => ({ log: KWHealth.emptyLog() }));
         return { ok: true };
       case 'kwStats':
         await handleStats(msg, sender);
@@ -275,12 +454,18 @@ function resetOnStart() {
   updateBadge();
 }
 
-chrome.runtime.onStartup.addListener(resetOnStart);
+chrome.runtime.onStartup.addListener(() => {
+  resetOnStart();
+  logEvent({ cat: 'extension', fn: 'Avvio', msg: `Estensione avviata (versione ${chrome.runtime.getManifest().version})` });
+});
 
 chrome.runtime.onInstalled.addListener(async (details) => {
   await migrateSettings();
   resetOnStart();
   const version = chrome.runtime.getManifest().version;
+  logEvent({ cat: 'extension', fn: 'Avvio', msg: details.reason === 'update' && details.previousVersion
+    ? `Estensione aggiornata dalla ${details.previousVersion} alla ${version}`
+    : details.reason === 'install' ? `Estensione installata (versione ${version})` : `Estensione ricaricata (versione ${version})` });
   // Novità da mostrare una volta nel menu (mai sul player durante la visione).
   if (details.reason === 'update' && details.previousVersion && details.previousVersion !== version) {
     await chrome.storage.local.set({ whatsNew: { version, from: details.previousVersion, at: Date.now() } });

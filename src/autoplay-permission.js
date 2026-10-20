@@ -22,7 +22,9 @@
   'use strict';
 
   const TAG = '[Keep_Watching]';
-  const PLAYER_HOST = 'vixcloud';
+  // Solo il player su vixcloud.co (o un suo sottodominio): host esplicito, non una parola
+  // qualsiasi nell'indirizzo.
+  const PLAYER_RE = /^(https?:)?\/\/([a-z0-9-]+\.)*vixcloud\.co(:\d+)?\//i;
   const REQUIRED = ['autoplay', 'fullscreen'];
   const MARK = 'kw_autoplay=1';
 
@@ -30,7 +32,7 @@
     const src = frame.getAttribute('src') || '';
     // Solo l'iframe del player. Se il sito ne assegna l'URL in un secondo momento,
     // la modifica di src fa ripassare l'iframe da qui.
-    if (!src.includes(PLAYER_HOST)) return;
+    if (!PLAYER_RE.test(src)) return;
 
     // 1. Permesso, prima di toccare l'URL.
     const current = (frame.getAttribute('allow') || '')

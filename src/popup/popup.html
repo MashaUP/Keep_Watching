@@ -27,6 +27,12 @@
       <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M4.5 19.5h15"/></symbol>
       <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4.5 7h15"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 12.5h9l1-12.5"/></symbol>
       <symbol id="i-tab" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="15" rx="2"/><path d="M3 9h18"/></symbol>
+      <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12.5h4l2.5-6 4 12 2.5-6H21"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><path d="M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4 21 19.5H3z"/><path d="M12 10v4.5"/><path d="M12 17.3h.01"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="m9 9 6 6M15 9l-6 6"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 12h7"/></symbol>
       <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5"/><path d="M12 7.6h.01"/></symbol>
     </defs>
   </svg>
@@ -36,7 +42,7 @@
       <div class="brand">
         <img src="../../icons/icon48.png" alt="" width="30" height="30">
         <div>
-          <div class="brand-name">Keep_Watching</div>
+          <div class="brand-name">Keep_<span class="grad">Watching</span></div>
           <div class="brand-ver" id="version"></div>
         </div>
       </div>
@@ -46,6 +52,8 @@
         <button type="button" data-section="playback"><svg><use href="#i-play"/></svg><span>Riproduzione</span></button>
         <button type="button" data-section="ui"><svg><use href="#i-screen"/></svg><span>Interfaccia sul video</span></button>
         <button type="button" data-section="profiles"><svg><use href="#i-user"/></svg><span>Profili</span></button>
+        <button type="button" data-section="health"><svg><use href="#i-pulse"/></svg><span>Centro salute</span><i class="dot warn" id="navHealthDot" hidden></i></button>
+        <button type="button" data-section="log"><svg><use href="#i-list"/></svg><span>Cronologia</span></button>
         <button type="button" data-section="stats"><svg><use href="#i-chart"/></svg><span>Statistiche</span></button>
         <button type="button" data-section="updates"><svg><use href="#i-refresh"/></svg><span>Aggiornamenti</span><i class="dot" id="navUpdateDot" hidden></i></button>
         <button type="button" data-section="kofi"><svg><use href="#i-cup"/></svg><span>Sostieni</span></button>
@@ -58,6 +66,10 @@
     </aside>
 
     <main id="main">
+      <div class="banner warn" id="storageError" role="alert" hidden>
+        <svg><use href="#i-alert"/></svg>
+        <div class="banner-body"><b>Impostazione non salvata</b><span id="storageErrorText"></span></div>
+      </div>
 
       <!-- ======================= PANORAMICA ======================= -->
       <section data-section="overview">
@@ -79,13 +91,14 @@
           </label>
         </div>
 
+        <div class="card tab-card" id="tabStatus" aria-live="polite"></div>
+
         <div class="card" id="whatsNew" hidden>
           <div class="card-head"><h2 id="whatsNewTitle"></h2><button type="button" class="link" id="whatsNewClose">Chiudi</button></div>
           <ul class="notes" id="whatsNewList"></ul>
         </div>
 
-        <div class="tiles status-tiles">
-          <div class="tile"><span class="tile-label">Sul player</span><span class="tile-value" id="stNow"></span><span class="tile-sub" id="stNowSub"></span></div>
+        <div class="tiles status-tiles three">
           <button type="button" class="tile tile-link" data-goto="profiles"><span class="tile-label">Profilo</span><span class="tile-value" id="stProfile"></span><span class="tile-sub" id="stProfileSub"></span></button>
           <div class="tile"><span class="tile-label">Timer di spegnimento</span><span class="tile-value" id="stSleep"></span><span class="tile-sub" id="stSleepSub"></span></div>
           <div class="tile"><span class="tile-label">Episodi di fila</span><span class="tile-value" id="stStreak"></span><span class="tile-sub" id="stStreakSub"></span></div>
@@ -116,6 +129,70 @@
         <a class="kofi-line" target="_blank" rel="noopener noreferrer" data-kofi-link hidden>
           <svg><use href="#i-cup"/></svg> Ti è utile? Offrimi un caffè su Ko-fi
         </a>
+      </section>
+
+      <!-- ======================= CENTRO SALUTE ======================= -->
+      <section data-section="health" hidden>
+        <header class="sec-head"><h1>Centro salute</h1><p>Cosa funziona davvero nella scheda che stai guardando, e perché qualcosa non va.</p></header>
+
+        <div class="card tab-card" id="healthTab" aria-live="polite"></div>
+
+        <div class="card">
+          <div class="card-head"><h2>Verifica tutto</h2><span class="hint" id="hcLast"></span></div>
+          <p class="hint">Controlla sito, player, controlli, prossimo episodio, salti, ripresa dello streaming e memoria. Non cambia episodio, non fa salti, non mette in pausa e non ricarica nulla.</p>
+          <div class="actions">
+            <button type="button" class="btn primary" id="verifyAll"><svg><use href="#i-pulse"/></svg>Verifica tutto</button>
+          </div>
+          <div class="hc-summary" id="hcSummary" hidden></div>
+          <ul class="hc-list" id="hcList"></ul>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Ultimi problemi in questa scheda</h2></div>
+          <div id="hcProblems"></div>
+          <div class="actions"><button type="button" class="btn small" data-goto="log"><svg><use href="#i-list"/></svg>Apri la cronologia</button></div>
+        </div>
+
+        <details class="card notes-card">
+          <summary>Come leggere i risultati</summary>
+          <ul class="notes">
+            <li><b>Funzionante</b>: verificato adesso, oppure visto funzionare in questa scheda (per esempio il cambio che ha portato a questo episodio).</li>
+            <li><b>Da verificare</b>: presente e pronto, ma si potrà dire che funziona solo quando scatta (per esempio il salto dei titoli, che avviene a fine episodio).</li>
+            <li><b>Non disponibile</b>: spento da te, non supportato da questa pagina oppure in errore. Il dettaglio di ogni voce dice quale dei tre.</li>
+            <li>Motivo <b>noto</b>: lo dice il browser (per esempio un codice di errore del video). Motivo <b>probabile</b>: dedotto da ciò che manca (per esempio un pulsante non trovato fa pensare a un cambio del sito).</li>
+          </ul>
+        </details>
+      </section>
+
+      <!-- ======================= CRONOLOGIA ======================= -->
+      <section data-section="log" hidden>
+        <header class="sec-head"><h1>Cronologia eventi</h1><p>Cosa è successo, dal più recente. Resta solo su questo computer.</p></header>
+
+        <div class="card">
+          <div class="log-tools">
+            <div class="seg" id="logFilter" role="radiogroup" aria-label="Livello">
+              <button type="button" data-value="all">Tutti</button><button type="button" data-value="warn">Avvisi ed errori</button><button type="button" data-value="error">Solo errori</button>
+            </div>
+            <span class="hint" id="logCount"></span>
+          </div>
+          <p class="empty" id="logEmpty" hidden>Nessun evento da mostrare.</p>
+          <ol class="log-list" id="logList"></ol>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><h2>Esporta o cancella</h2></div>
+          <p class="hint">Gli eventi ripetuti si raggruppano in una riga (×N) e si tengono al massimo gli ultimi 300. Nessun indirizzo completo, token o cookie: solo host e percorso.</p>
+          <div class="actions">
+            <button type="button" class="btn" id="logExport"><svg><use href="#i-download"/></svg>Esporta JSON</button>
+            <button type="button" class="btn danger-outline" id="logClear"><svg><use href="#i-trash"/></svg>Cancella cronologia</button>
+          </div>
+          <div class="confirm-box" id="logClearConfirm" hidden>
+            <b>Cancellare tutta la cronologia?</b>
+            <span>Impostazioni e statistiche restano come sono.</span>
+            <div class="actions"><button type="button" class="btn small" id="logClearCancel">Annulla</button><button type="button" class="btn small danger" id="logClearGo">Cancella</button></div>
+          </div>
+          <p class="hint" id="logResult" hidden></p>
+        </div>
       </section>
 
       <!-- ======================= RIPRODUZIONE ======================= -->
@@ -435,6 +512,7 @@
   <script src="../defaults.js"></script>
   <script src="../lib/stats.js"></script>
   <script src="../lib/updates.js"></script>
+  <script src="../lib/health.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

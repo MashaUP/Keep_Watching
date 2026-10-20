@@ -69,7 +69,7 @@ class KW:
         self.t0 = time.time()
         self.page.on('console', self._console)
         self.page.on('pageerror', lambda e: self._log(f'PAGEERROR {e}'))
-        await config(self.page, last=3, stall=0, title='Brothers', broken=0)
+        await config(self.page, last=3, stall=0, title='Brothers', broken=0, clip='short', deadnext=0, noplayer=0, novideo=0)
         return self
 
     async def _github(self, route):
@@ -116,6 +116,27 @@ class KW:
     async def command(self, name):
         """Come premere la scorciatoia: stessa funzione usata da chrome.commands.onCommand."""
         return await self.sw.evaluate(f"handleCommand('{name}')")
+
+    # ---- cronologia e stato della scheda
+    async def events(self):
+        log = (await self.get('eventLog')).get('eventLog') or {}
+        return log.get('events', [])
+
+    async def event_msgs(self):
+        return [e['msg'] + (f" [{e['result']}]" if e.get('result') else '') + (f" ×{e['count']}" if e.get('count', 1) > 1 else '') for e in await self.events()]
+
+    async def tab_health(self):
+        """Stato salvato dal service worker per la scheda di self.page (chrome.storage.session)."""
+        all_ = await self.sw.evaluate('chrome.storage.session.get(null)')
+        hs = [v for k, v in all_.items() if k.startswith('health:')]
+        return sorted(hs, key=lambda v: v.get('at', 0))[-1] if hs else None
+
+    async def verify(self, tab_id):
+        """Verifica tutto, chiesta da una pagina dell'estensione come fa il menu."""
+        pg = await self.popup()
+        res = await pg.evaluate('id => chrome.runtime.sendMessage({ type: "kwVerifyAll", tabId: id })', tab_id)
+        await pg.close()
+        return res
 
     # ---- player
     def player(self):

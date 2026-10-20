@@ -254,22 +254,22 @@ async def main():
         check('Sei aggiornato' in st and await pg.is_disabled('#updateAction') and await text(pg, '#uLatest') == CUR, 'stessa versione: "Sei aggiornato"')
         check(len(await pg.eval_on_selector_all('#historyList .history-item', 'l => l')) == 2, 'registro delle versioni dalle release')
 
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v1.6.0-beta.1', pre=True), rel('v1.5.0'), rel('v' + CUR)])})
-        check('1.5.0' in st and await text(pg, '#updateAction') == 'Scarica aggiornamento', 'versione più recente: "Scarica aggiornamento"')
-        check(await visible(pg, '#uPrerelease') and '1.6.0-beta.1' in await text(pg, '#uPrerelease'), 'versione di prova segnalata ma non proposta')
+        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v9.1.0-beta.1', pre=True), rel('v9.0.0'), rel('v' + CUR)])})
+        check('9.0.0' in st and await text(pg, '#updateAction') == 'Scarica aggiornamento', 'versione più recente: "Scarica aggiornamento"')
+        check(await visible(pg, '#uPrerelease') and '9.1.0-beta.1' in await text(pg, '#uPrerelease'), 'versione di prova segnalata ma non proposta')
         check(await visible(pg, '#navUpdateDot') is False, 'aperta la sezione: indicatore sul menu spento')
         async with k.ctx.expect_page() as newp:
             await pg.click('#updateAction')
         p2 = await newp.value
         await asyncio.sleep(0.3)
-        check('releases/download/v1.5.0/Keep_Watching-1.5.0.zip' in p2.url, f'download dallo zip della release ufficiale')
+        check('releases/download/v9.0.0/Keep_Watching-9.0.0.zip' in p2.url, f'download dallo zip della release ufficiale')
         await p2.close()
         page_text = await text(pg, 'section[data-section="updates"]')
         check('installat' not in (await text(pg, '#uStatus')).lower() and not await visible(pg, '#installBanner') and (await k.get('reloadRequest')).get('reloadRequest') is None,
               'dopo il download non dice "installato"')
         check(await visible(pg, '#installSteps'), 'istruzioni per installare lo zip')
 
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v1.5.0', body='', asset=False)])})
+        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v9.0.0', body='', asset=False)])})
         check(await text(pg, '#updateAction') == 'Apri la pagina su GitHub' and 'non ha note' in await text(pg, '#uNotes'), 'release senza zip né note: pagina della release')
 
         st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v' + OLD)])})

@@ -23,6 +23,10 @@ Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando i
 17. [Statistiche](#17-statistiche)
 18. [Aggiornamenti da GitHub](#18-aggiornamenti-da-github)
 19. [Test](#19-test)
+20. [Stato del player, Centro salute e cronologia](#20-stato-del-player-centro-salute-e-cronologia)
+21. [Checklist manuale sul sito reale](#21-checklist-manuale-sul-sito-reale)
+
+Audit, matrice dei guasti e piani di ripresa per sito e player: **[COMPATIBILITA.md](COMPATIBILITA.md)**.
 
 ---
 
@@ -67,21 +71,24 @@ Dati osservati:
 | `src/lib/stats.js` | Player, service worker e popup | Statistiche: giorni, sessioni, riepiloghi, CSV, JSON, importazione (oggetto globale `KWStats`) |
 | `src/lib/updates.js` | Popup | Controllo degli aggiornamenti su GitHub e confronto delle versioni (oggetto globale `KWUpdates`) |
 | `src/recovery.js` | Pagine del sito (`*/iframe/*`) | Su richiesta ricarica l'iframe intermedio con `minute=N` |
+| `src/site-health.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | Riconosce la struttura della pagina (iframe dell'episodio, iframe del player su vixcloud.co), segnala le pagine senza player, risponde a "Verifica tutto" |
+| `src/lib/health.js` | Player, service worker e popup | Macchina a stati del player, politica dei tentativi, classificazione degli errori del video, verifiche, cronologia eventi (oggetto globale `KWHealth`) |
 | `src/autoplay-permission.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | Aggiunge `allow="autoplay"` all'iframe del player e lo ricarica con il marcatore |
 | `src/cinema.js` | Pagine del sito (`*/iframe/*`, `*/watch/*`) | In modalità cinema allarga a tutta la finestra l'iframe che porta al player; Esc per uscire |
-| `src/background.js` | Service worker | Badge, scorciatoie, notifiche, schermo intero della finestra, unico scrittore delle statistiche, migrazione delle impostazioni, novità dopo un aggiornamento |
+| `src/background.js` | Service worker | Badge, scorciatoie, notifiche, schermo intero della finestra, unico scrittore di statistiche e cronologia, stato per scheda, Verifica tutto, migrazione delle impostazioni, novità dopo un aggiornamento |
 | `rules.json` | Rete del browser | Blocca il caricamento del player senza marcatore `kw_autoplay=1` |
 | `src/defaults.js` | Service worker, player e popup | Opzioni predefinite e validazione, profili, categorie di popup, comandi, link del progetto; documenta tutte le chiavi di `chrome.storage.local` |
 | `src/popup/*` | Menu dell'icona (anche in scheda con `?tab=1`) | Sezioni, impostazioni, statistiche, aggiornamenti |
 
-Nel player, `defaults.js`, `lib/stats.js`, `panel.js`, `toolbar.js`, `guide.js` e `player.js` vengono caricati in quest'ordine (vedi `manifest.json`) e condividono le stesse variabili globali: `player.js` usa `kwSanitize`, `kwPopupVisible`, `kwActiveSleep`, `kwFormatTime`, `KWStats`, `kwCreatePanel`, `kwCreateToast`, `kwCreateToolbar` e `kwCreateGuide` definiti negli altri. Il service worker carica `defaults.js` e `lib/stats.js` con `importScripts`.
+Nel player, `defaults.js`, `lib/stats.js`, `lib/health.js`, `panel.js`, `toolbar.js`, `guide.js` e `player.js` vengono caricati in quest'ordine (vedi `manifest.json`) e condividono le stesse variabili globali: `player.js` usa `kwSanitize`, `kwPopupVisible`, `kwActiveSleep`, `kwFormatTime`, `KWStats`, `kwCreatePanel`, `kwCreateToast`, `kwCreateToolbar` e `kwCreateGuide` definiti negli altri. Il service worker carica `defaults.js`, `lib/stats.js` e `lib/health.js` con `importScripts`.
 
 ### Flusso di un cambio episodio
 
 1. Il video finisce: `player.js` riceve l'evento `ended` (oppure `timeupdate` se "salta i titoli di coda" è attivo).
 2. Se il pulsante `.next-episode` non c'è, `player.js` chiede una notifica di fine episodi (o di pulsante non trovato, se l'URL ha `nextEpisode=1`).
 3. Se il limite "chiedi se continuare" è raggiunto, mostra la domanda sul player e si ferma lì finché non si risponde.
-4. Altrimenti mostra il conto alla rovescia; alla scadenza (o con "Vai ora") aggiorna il conteggio, salva `pendingPlayAt`, passa alla modalità cinema se il player è a schermo intero e clicca `.next-episode`.
+4. Altrimenti mostra il conto alla rovescia; alla scadenza (o con "Vai ora") aggiorna il conteggio, salva `pendingPlayAt`, passa alla modalità cinema se il player è a schermo intero e clicca `.next-episode` (solo se non è disattivato; se il player dice che c'è un successivo ma il pulsante non c'è ancora, lo aspetta fino a 3 s). Da qui lo stato del player è "cambio episodio" e un nuovo cambio non può partire.
+4b. Se dopo 15 s il documento del player esiste ancora, il clic non ha avuto effetto: si clicca una seconda volta; dopo altri 15 s compare "Cambio episodio non riuscito" con **Riprova**, l'errore va in cronologia e, con la scheda nascosta, arriva una notifica.
 5. Il sito aggiorna l'URL della pagina principale e ricarica l'iframe intermedio.
 6. Nell'iframe intermedio, il browser inizia a caricare il player; `rules.json` blocca la richiesta.
 7. `autoplay-permission.js` aggiunge `allow="autoplay; fullscreen"` all'iframe e reimposta l'URL con `&kw_autoplay=1`: la regola lo lascia passare.
@@ -481,6 +488,47 @@ tests/e2e/run_all.sh
 | `test_popups.py` | Categorie nascoste e "nascondi tutti" con le automazioni attive, limite in modo sicuro, recupero silenzioso |
 | `test_stats.py` | Tempo reale, pause, velocità 2×, sessioni, completamenti, intro e titoli, raccolta spenta, azzeramento |
 | `test_guide_ui.py` | Guida alle scorciatoie, Esc, chiusura automatica, aspetto della barra e scelta dei pulsanti sul player |
+| `test_health.py` | Stato della scheda, Verifica tutto (anche non distruttiva), cambio riuscito e verificato, clic senza effetto (due clic, poi avviso), pagina senza player, player senza video, pagina non supportata, blocco e ripresa con esito, Centro salute e cronologia nel menu |
 | `test_popup.py` | Menu: migrazione dalla 1.4.0, impostazioni, popup, pulsanti e aspetto della barra, profili, statistiche (grafico, CSV, JSON, importazione, azzeramento), centro aggiornamenti con GitHub finto, novità, verifica dopo la ricarica, Ko-fi |
 
+Opzioni del sito di prova per i guasti (`/__config`): `deadnext=1` (il pulsante c'è ma il clic non fa nulla), `noplayer=1` (pagina dell'episodio senza player), `novideo=1` (player senza video), `stall=1` (video che si blocca), `broken=1` (successivo dichiarato ma pulsante assente).
+
 **Da provare a mano** (non riproducibili sul sito di prova): il sito e il player reali, l'API vera di GitHub con il repository pubblico, `chrome.runtime.reload()` dopo l'estrazione dello zip (in Chromium avviato da Playwright l'estensione ricaricata non torna disponibile), le scorciatoie premute davvero in Brave e i conflitti con altre estensioni, la pausa con la scheda nascosta, `tools/package.ps1` su Windows.
+
+## 20. Stato del player, Centro salute e cronologia
+
+**Stato del player.** `player.js` crea una macchina a stati (`KWHealth.createMachine`) e la alimenta con gli eventi del `<video>` (`loadedmetadata`/`canplay`, `playing`, `pause`, `waiting`, `ended`, `error`), con l'avanzamento reale del tempo (`timeupdate` con il tempo che cresce di poco) e con le decisioni dell'estensione (blocco rilevato, recupero, cambio episodio, cambio fallito, serve un'azione, nessun video dopo 30 s). Stati, transizioni e condizioni di uscita sono in [COMPATIBILITA.md, sezione 3](COMPATIBILITA.md#3-macchina-a-stati-del-player). Lo stato e alcuni dati (pulsante "prossimo episodio", ultimo errore, ultimo recupero, ultimo cambio, permesso di autoplay del documento) arrivano al service worker con `kwHealth` al massimo una volta al secondo e vengono salvati in `chrome.storage.session` sotto `health:<id scheda>`. Alla chiusura del player (`pagehide`) lo stato diventa "chiuso"; all'uscita dalla pagina principale la voce della scheda si cancella; alla chiusura della scheda pure.
+
+**Verifica tutto.** Il menu manda `kwVerifyAll` con l'id della scheda (quella attiva, o l'ultima con un episodio se il menu è aperto in una scheda). Il service worker manda `kwHealthCheck` a tutti i frame della scheda; ogni frame (pagina principale, iframe dell'episodio, player) risponde con un proprio messaggio `kwHealthReport`, raccolto per 1,5 secondi. `chrome.tabs.sendMessage` restituisce una sola risposta e l'elenco dei frame richiederebbe il permesso `webNavigation`: così non serve. Se nessuno script risponde, la scheda non è una pagina del sito. Al risultato si aggiungono la prova della memoria (scrittura e lettura in `local` e `session`) e gli errori dell'ultima ora. Le verifiche del player leggono soltanto: non cambiano episodio, non saltano, non mettono in pausa. Il risultato va in `healthLast` e in cronologia.
+
+**Cronologia.** Chiave `eventLog` (`{ schema: 1, events: [...] }`), scritta solo dal service worker in coda (`withLog`). Ogni evento: `at`, `cat` (extension, site, player, next, skip, recovery, health, settings), `level` (info, warn, error), `msg`, e se servono `fn`, `from`, `to`, `action`, `result`, più `count` e `lastAt` per i raggruppamenti. `KWHealth.cleanEvent` tiene solo questi campi, accorcia i testi e toglie dagli indirizzi tutto tranne host e percorso (e i parametri come `token=`). Lo stesso evento entro 10 minuti aumenta il conteggio; si tengono 300 righe.
+
+**Messaggi privilegiati.** `kwStatsReset`, `kwStatsImport`, `kwVerifyAll`, `kwLogClear` e `kwShowGuide` sono accettati solo se `sender.url` è una pagina dell'estensione. Tutti i messaggi devono avere `sender.id` uguale all'id dell'estensione (le pagine web non possono comunque scrivere all'estensione: manca `externally_connectable`).
+
+**Aggiungere un evento.** Nel player: `logEvent({ cat, level, fn, msg, action, result })`. Nelle pagine del sito: lo stesso in `site-health.js`. Un evento va registrato quando cambia qualcosa di significativo, non a ogni `timeupdate`.
+
+## 21. Checklist manuale sul sito reale
+
+Da fare su StreamingCommunity con Brave, con il menu aperto su **Centro salute** e **Cronologia** a portata di mano. Segna per ogni voce: superato, fallito, non eseguito.
+
+1. Caricamento normale: Verifica tutto con sito, iframe, player, controlli, autoplay **Funzionante**.
+2. Rilevamento del player: in cronologia "Player rilevato" con il nome dell'episodio.
+3. Comparsa ritardata del player (rete lenta o pagina ricaricata): lo stato passa da "in caricamento" a "in riproduzione" senza errori.
+4. Sostituzione dell'iframe (cambio episodio): nuovo "Player rilevato", nessun doppio cambio.
+5. Cambio episodio automatico: "Cambio riuscito" in cronologia; nel nuovo episodio Verifica tutto dà prossimo episodio **Funzionante**.
+6. Conto alla rovescia: compare, si consuma, cambia episodio.
+7. Annulla del conto alla rovescia: nessun cambio, evento "annullato da te".
+8. Salto intro segnato: evento "Intro saltata"; Verifica tutto lo dà **Funzionante** nell'episodio.
+9. Salto dei titoli: evento "Titoli di coda" e cambio al momento giusto.
+10. Riproduzione temporaneamente bloccata (rete scollegata per 15 s): "Video bloccato", salto, poi "ripartito" o ricarica con esito.
+11. Buffering prolungato: l'evento dice "in attesa di dati".
+12. Errore recuperabile: ricarica e ripresa al secondo giusto, esito "riuscita".
+13. Errore non recuperabile (rete scollegata a lungo): niente ricariche a ripetizione, avviso "ricarica la pagina".
+14. Refresh della pagina: lo stato della scheda riparte, nessun dato vecchio nel menu.
+15. Ricarica dell'estensione da `brave://extensions`: dopo aver ricaricato la pagina tutto torna **Funzionante**.
+16. Popup aperto e chiuso durante la visione: lo stato resta.
+17. Preferenze dopo un aggiornamento: tutte uguali.
+18. Verifica tutto durante la riproduzione: il video non si ferma, non salta, non cambia episodio.
+19. Cronologia: esportazione JSON senza token o indirizzi completi; cancellazione.
+20. Nessun tentativo infinito: con lo streaming fermo a lungo, al massimo un salto e una ricarica, poi l'avviso.
+

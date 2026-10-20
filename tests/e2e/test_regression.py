@@ -77,6 +77,14 @@ async def main():
         check(v and p and p.startswith('Timer di spegnimento') and 'Riprendi' in p, f'a tempo: video fermo con il riquadro ({p})')
         check((await k.video())['vol'] == vol, f'volume ripristinato dopo la dissolvenza ({vol})')
         check((await k.get('sleep'))['sleep']['mode'] == 'off', 'timer spento dopo lo stop')
+        # Fino alla 1.4.1, con il cambio automatico spento, qualsiasi scrittura nello storage
+        # (per esempio le statistiche ogni 15 s) chiudeva questo riquadro.
+        await k.set({'autoNext': False})
+        await k.set({'kwTestNoise': 1})
+        await asyncio.sleep(0.5)
+        p = await k.panel()
+        check(p and p.startswith('Timer di spegnimento'), 'il riquadro del timer resta aperto con il cambio automatico spento e altre scritture')
+        await k.set({'autoNext': True})
 
         await k.click_panel('Riprendi')
         await asyncio.sleep(1)

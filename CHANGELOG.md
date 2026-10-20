@@ -3,6 +3,34 @@
 Tutte le modifiche rilevanti del progetto sono elencate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e le versioni seguono il [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.5.0] - 2026-10-20
+
+### Aggiunto
+- **Centro salute** nel menu: stato reale della scheda (sito, player, prossimo episodio, ripresa, ultimo errore) e **Verifica tutto**, che controlla sito, iframe e permesso di autoplay, player, controlli, prossimo episodio, salti, ripresa, memoria ed errori recenti senza toccare il video. Tre esiti (Funzionante, Da verificare, Non disponibile) con il dettaglio: disattivata da te, non attiva adesso, non supportata, in errore, non provata.
+- **Cronologia eventi** locale: player e pagina riconosciuti, cambi di episodio con l'esito, conto alla rovescia, salti, blocchi e tentativi di ripresa con l'esito, errori del video, risultati delle verifiche. Eventi ripetuti raggruppati, al massimo 300, senza indirizzi completi né token; esportazione JSON e cancellazione.
+- **Stato della scheda nella Panoramica**: con accesso rapido a Verifica tutto, Centro salute e Cronologia.
+- **Macchina a stati del player** (`src/lib/health.js`): in caricamento, pronto, in riproduzione, in pausa, caricamento dati, bloccato, recupero in corso, cambio episodio, finito, errore recuperabile, serve un'azione, non compatibile.
+- **Verifica del cambio episodio**: se il clic su "prossimo episodio" non ha effetto entro 15 secondi si riprova una volta, poi compare "Cambio episodio non riuscito" con **Riprova** (e una notifica se la scheda è nascosta).
+- **Ripresa con esito verificato**: dopo la ricarica il recupero è riuscito solo se il video riparte entro 20 secondi.
+- Riconoscimento della pagina dell'episodio (`src/site-health.js`): segnala le pagine senza player (errore o manutenzione del sito) e i player senza video.
+- **Nuova icona**: anello viola-azzurro con freccia e play, e accento coordinato nel menu e sul player; icone vettoriali al posto dei caratteri nei riquadri del player.
+- **Documento di compatibilità** (`docs/COMPATIBILITA.md`): audit, siti supportati, matrice dei guasti, piani di ripresa.
+
+### Corretto
+- Con il cambio automatico spento o l'estensione sospesa, qualsiasi scrittura nello storage (per esempio le statistiche ogni 15 secondi) chiudeva i riquadri del player, anche quello del timer di spegnimento.
+- Il pulsante "prossimo episodio" veniva cliccato anche se disattivato, e un pulsante comparso con qualche secondo di ritardo risultava mancante.
+- Il salto di recupero con durata del video sconosciuta generava un errore.
+- Un caricamento interrotto (cambio pagina) provocava una ricarica dell'episodio; ora gli errori del video sono classificati per codice.
+- Se nessuna pagina del sito raccoglieva la richiesta di ricarica, il player non lo sapeva: ora lo dice e chiede di ricaricare a mano.
+- Riconoscimento dell'iframe del player più preciso: serve l'host vixcloud.co, non basta la parola nell'indirizzo.
+
+### Sicurezza
+- Le operazioni che cancellano o sostituiscono dati (azzeramento e importazione delle statistiche, cancellazione della cronologia) e Verifica tutto sono accettate solo dalle pagine dell'estensione, non dagli script nelle pagine del sito. Ogni messaggio deve provenire dall'estensione stessa.
+
+### Modificato
+- Il menu segnala quando un'impostazione non è stata salvata (memoria del browser piena o non disponibile).
+- Nessun permesso nuovo.
+
 ## [1.4.1] - 2026-10-18
 
 ### Aggiunto

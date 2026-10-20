@@ -13,6 +13,9 @@ le stesse classi di JW Player che l'estensione usa (.jwplayer, .jw-controlbar,
   title=…       titolo della serie
   broken=1      il player dice che c'è un episodio successivo ma il pulsante manca
   clip=long     video di 12 minuti invece di 90 secondi
+  deadnext=1    il pulsante "prossimo episodio" c'è ma il clic non fa nulla
+  noplayer=1    la pagina dell'episodio non contiene il player (pagina di errore)
+  novideo=1     il player ha il contenitore di JW Player ma nessun video
 I video si creano con make_clips.sh (serve ffmpeg).
 """
 import base64, http.server, os, socketserver, sys, time, urllib.parse
@@ -20,7 +23,7 @@ import base64, http.server, os, socketserver, sys, time, urllib.parse
 HERE = os.path.dirname(os.path.abspath(__file__))
 CLIPS = {'short': os.path.join(HERE, 'clip-90s.webm'), 'long': os.path.join(HERE, 'clip-12min.webm')}
 PORT = int(os.environ.get('KW_PORT', '8000'))
-CONFIG = {'last': '3', 'stall': '0', 'title': 'Brothers', 'broken': '0', 'clip': 'short'}
+CONFIG = {'last': '3', 'stall': '0', 'title': 'Brothers', 'broken': '0', 'clip': 'short', 'deadnext': '0', 'noplayer': '0', 'novideo': '0'}
 b64 = lambda s: base64.b64encode(s.encode()).decode()
 
 
@@ -75,6 +78,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             for k, v in q.items():
                 CONFIG[k] = v[0]
             return self.send_html('ok')
+        if u.path == '/altro':
+            return self.send_html('<!doctype html><html><body><h1>Una pagina qualsiasi</h1></body></html>')
         if u.path in ('/clip.webm', '/stall.webm'):
             return self.send_video(u.path == '/stall.webm')
         if u.path.startswith('/it/watch/'):
@@ -84,6 +89,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 <script>addEventListener('message', e => { if (e.data && e.data.type==='next') { document.getElementById('mid').src='/it/iframe/1?episode_id='+e.data.ep; history.pushState({},'', '/it/watch/1?e='+e.data.ep); } });</script>
 </body></html>""")
         if u.path.startswith('/it/iframe/'):
+            if CONFIG['noplayer'] == '1':
+                return self.send_html('<!doctype html><html><body><h1>Servizio in manutenzione</h1></body></html>')
             ep = int(q['episode_id'][0])
             minute = q.get('minute', [''])[0]
             last = int(CONFIG['last'])
@@ -99,8 +106,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             minute = int(q.get('minute', ['0'])[0] or 0)
             src = '/stall.webm' if q.get('stall') else '/clip.webm'
             show_next = ep < int(CONFIG['last']) and CONFIG['broken'] != '1'
+            action = '' if CONFIG['deadnext'] == '1' else f"top.postMessage({{type:'next',ep:{ep + 1}}},'*')"
             nextbtn = (f'<div class="jw-icon jw-icon-inline next-episode" role="button" '
-                       f'onclick="top.postMessage({{type:\'next\',ep:{ep + 1}}},\'*\')">NEXT</div>') if show_next else ''
+                       f'onclick="{action}">NEXT</div>') if show_next else ''
+            if CONFIG['novideo'] == '1':
+                return self.send_html('<!doctype html><html><body><div class="jwplayer"><div class="jw-error">Errore del player</div></div></body></html>')
             return self.send_html(f"""<!doctype html><html><body style="margin:0;background:#000">
 <div class="jwplayer" style="position:relative;width:100%;height:100vh">
 <video src="{src}" style="width:100%;height:100%"></video>

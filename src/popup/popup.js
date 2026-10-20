@@ -24,23 +24,28 @@
       else if (k === 'text') el.textContent = v;
       else el.setAttribute(k, v === true ? '' : v);
     }
-    for (const c of children.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+    for (const c of children.flat(Infinity)) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
     return el;
   }
 
   const EXTRA_DEFAULTS = {
     streak: 0, lastAutoAt: 0, sleep: null, series: {}, stats: null,
-    updateCheck: null, updateSeen: null, whatsNew: null, reloadRequest: null
+    updateCheck: null, updateSeen: null, whatsNew: null, reloadRequest: null,
+    eventLog: null, healthLast: null
   };
 
   let S = kwSanitize({});
   let X = { ...EXTRA_DEFAULTS };
-  let nowPlaying = null;
   let statsRange = '7';
   let localChangelog = null;
   let checking = false;
 
-  const set = (obj) => chrome.storage.local.set(obj);
+  // Scrittura delle impostazioni: se la memoria del browser rifiuta (spazio esaurito, profilo
+  // danneggiato) lo si dice subito, invece di far sembrare salvata una scelta che non lo è.
+  const set = (obj) => chrome.storage.local.set(obj).then(() => { $('storageError').hidden = true; }, (e) => {
+    $('storageError').hidden = false;
+    $('storageErrorText').textContent = `La modifica non è stata salvata: ${e && e.message ? e.message : 'errore della memoria del browser'}.`;
+  });
   const store = {
     get: (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
     put: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* memoria del browser non disponibile */ } }
@@ -375,17 +380,6 @@
   // ---------- Panoramica ----------
 
   function renderOverview() {
-    // Sul player: ultimo stato riferito dal player (memoria di sessione del browser).
-    const np = nowPlaying;
-    const fresh = np && ((np.playing && Date.now() - np.at < 45000) || (!np.playing && Date.now() - np.at < 30 * 60000));
-    if (fresh) {
-      $('stNow').textContent = np.title || 'Episodio';
-      $('stNowSub').textContent = `${np.name ? `${np.name} · ` : ''}${np.playing ? 'in riproduzione' : 'in pausa'}`;
-    } else {
-      $('stNow').textContent = 'Nessun episodio';
-      $('stNowSub').textContent = 'Apri un episodio sul sito';
-    }
-
     const p = KW_PROFILES[S.profile];
     $('stProfile').textContent = p.label;
     $('stProfileSub').textContent = kwProfileDiff(S.profile, S).length ? 'Personalizzato' : 'Come da profilo';
@@ -439,7 +433,12 @@
     $('whatsNewTitle').textContent = `Aggiornata alla ${VERSION}${w.from ? ` (prima avevi la ${w.from})` : ''}`;
     // Solo il titolo di ogni voce ("Profili", "Statistiche locali"…): i dettagli sono in Aggiornamenti.
     const items = section ? section.items.filter((i) => i.section !== 'Modificato').slice(0, 9) : [];
-    const head = (t) => { const m = /^([^:]{3,70}):\s/.exec(t); return m ? m[1] : t; };
+    const head = (t) => {
+      const m = /^([^:]{3,70}):\s/.exec(t);
+      if (m) return m[1].replace(/\s*\([^)]*\)\s*$/, '');
+      const cut = t.split(/[.;(]/)[0].trim();
+      return cut.length > 70 ? `${cut.slice(0, 68)}…` : cut;
+    };
     $('whatsNewList').replaceChildren(...(items.length
       ? items.map((i) => h('li', { text: i.section === 'Corretto' ? `Corretto: ${head(i.text)}` : head(i.text) }))
       : [h('li', { text: 'Le novità sono in CHANGELOG.md.' })]));
@@ -508,7 +507,7 @@
     const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Minuti di visione al giorno, massimo ${Math.round(maxMin)} minuti` });
     const defs = el('defs', {});
     const pat = el('pattern', { id: 'kwHatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
-    pat.append(el('rect', { width: 6, height: 6, fill: '#2f74ff', opacity: 0.55 }), el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: '#9cbcff', 'stroke-width': 2 }));
+    pat.append(el('rect', { width: 6, height: 6, fill: '#5b63f0', opacity: 0.55 }), el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: '#9cbcff', 'stroke-width': 2 }));
     defs.append(pat);
     svg.append(defs);
 
@@ -815,6 +814,263 @@
     chrome.runtime.reload();
   });
 
+  // ---------- Questa scheda, Centro salute, Cronologia ----------
+  // Lo stato della scheda viene dal player e dalle pagine del sito (salvato dal service
+  // worker in chrome.storage.session per scheda): resta anche chiudendo il menu.
+
+  let activeTabId = null;
+  let tabHealth = null;      // { tabId, at, player, site, lastCheck }
+  let tabIsOther = false;    // nessun dato per la scheda attiva: si mostra l'ultima con un episodio
+  let logFilter = 'all';
+  let verifying = false;
+  const H = KWHealth;
+
+  const ago = (t) => {
+    const s = Math.max(0, Math.round((Date.now() - t) / 1000));
+    if (s < 60) return `${s} s fa`;
+    if (s < 3600) return `${Math.round(s / 60)} min fa`;
+    return fmtDateTime(t);
+  };
+  const TONE_ICON = { ok: 'i-check', wait: 'i-clock', warn: 'i-alert', error: 'i-x', off: 'i-minus' };
+  const STATUS_TONE = { ok: 'ok', check: 'wait', na: 'off' };
+  const STATUS_ICON = { ok: 'i-check', check: 'i-clock', na: 'i-minus' };
+
+  function badge(tone, text) {
+    return h('span', { class: `state-badge tone-${tone}` }, svgIcon(TONE_ICON[tone] || 'i-info'), h('span', { text }));
+  }
+
+  async function loadTabHealth() {
+    try {
+      if (activeTabId === null) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        activeTabId = tab && Number.isInteger(tab.id) ? tab.id : -1;
+      }
+      const all = await chrome.storage.session.get(null);
+      const entries = Object.entries(all).filter(([k]) => k.startsWith('health:')).map(([, v]) => v);
+      tabHealth = entries.find((e) => e.tabId === activeTabId) || null;
+      tabIsOther = false;
+      // Menu aperto in una scheda (o dati assenti per la scheda attiva): l'ultima scheda
+      // con un player attivo negli ultimi 30 minuti, dichiarandolo.
+      if (!tabHealth || (!tabHealth.player && !tabHealth.site)) {
+        const recent = entries.filter((e) => e.player && e.player.state !== 'closed' && Date.now() - e.at < 30 * 60000)
+          .sort((a, b) => b.at - a.at)[0];
+        if (recent && (IS_TAB || !tabHealth)) { tabHealth = recent; tabIsOther = true; }
+      }
+    } catch (e) {
+      tabHealth = null;
+    }
+  }
+
+  /** Righe "chiave: valore" sullo stato della scheda, dagli ultimi dati del player. */
+  function tabRows(th) {
+    const p = th && th.player && th.player.state !== 'closed' ? th.player : null;
+    const site = th && th.site;
+    const rows = [];
+    if (site && site.playerMissing) rows.push(['Sito', 'Pagina dell\'episodio senza player (errore del sito o struttura cambiata)', 'error']);
+    else if (site && site.recognized === false) rows.push(['Sito', 'Pagina /watch/ con struttura diversa da quella prevista', 'error']);
+    else if ((site && site.recognized) || p) rows.push(['Sito', `StreamingCommunity${site && site.host ? ` (${site.host})` : ''}`, 'ok']);
+
+    if (p) {
+      const st = H.STATES[p.state] || H.STATES.loading;
+      rows.push(['Player', st.text, st.tone]);
+      let next;
+      if (!S.enabled || !S.autoNext) next = ['Spento nelle impostazioni', 'off'];
+      else if (p.lastNext && p.lastNext.result === 'failed') next = [`Non riuscito: ${p.lastNext.reason}`, 'error'];
+      else if (p.nextButton === 'none') next = ['Ultimo episodio: nessun successivo', 'off'];
+      else if (p.nextButton !== 'ok') next = ['Pulsante non trovato nel player: il sito potrebbe essere cambiato', 'error'];
+      else if (p.arrivedBySwitch) next = ['Pronto; l\'ultimo cambio automatico è riuscito', 'ok'];
+      else next = ['Pronto: pulsante trovato, scatta a fine episodio', 'wait'];
+      rows.push(['Prossimo episodio', next[0], next[1]]);
+      const lr = p.lastRecovery;
+      if (!S.enabled || !S.watchdog) rows.push(['Ripresa streaming', 'Spenta nelle impostazioni', 'off']);
+      else if (lr) rows.push(['Ripresa streaming', `${lr.action}: ${lr.result} (${ago(lr.at)})`, /impossibil|non ripetuta|non è ripartito/.test(lr.result) ? 'error' : /riuscit/.test(lr.result) ? 'ok' : 'warn']);
+      else rows.push(['Ripresa streaming', 'Attiva: nessun blocco in questo episodio', 'ok']);
+      if (p.lastError) rows.push(['Ultimo errore', `${p.lastError.label} (${ago(p.lastError.at)}) — motivo noto: ${p.lastError.text}`, 'warn']);
+    } else if (site && site.recognized) {
+      const waiting = Date.now() - site.at < 30000;
+      rows.push(['Player', waiting ? 'In attesa del caricamento del player' : 'Non rilevato: il player non ha risposto dopo il caricamento della pagina', waiting ? 'wait' : 'error']);
+    }
+    return rows;
+  }
+
+  function renderTabCard(box, withActions) {
+    const th = tabHealth;
+    const p = th && th.player && th.player.state !== 'closed' ? th.player : null;
+    const parts = [];
+    let tone = 'off';
+    let label = 'Nessun episodio in questa scheda';
+    let sub = 'Apri un episodio su StreamingCommunity: qui vedrai cosa funziona. Se l\'hai appena aperto, aspetta qualche secondo o premi Verifica tutto.';
+    if (p) {
+      const st = H.STATES[p.state] || H.STATES.loading;
+      tone = st.tone;
+      label = st.label;
+      sub = [p.title, p.name].filter(Boolean).join(' · ') || 'Episodio';
+    } else if (th && th.site) {
+      tone = th.site.playerMissing || th.site.recognized === false ? 'error' : 'wait';
+      label = th.site.playerMissing ? 'Player non trovato' : th.site.recognized === false ? 'Pagina non riconosciuta' : 'In attesa del player';
+      sub = th.site.host || '';
+    }
+    parts.push(h('div', { class: 'tab-head' }, h('span', { class: 'tab-kicker', text: tabIsOther ? 'Ultima scheda con un episodio' : 'Questa scheda' }), badge(tone, label)));
+    if (sub) parts.push(h('p', { class: 'tab-title', text: sub }));
+    const rows = tabRows(th);
+    if (rows.length) {
+      parts.push(h('dl', { class: 'kv' }, rows.map(([k, v, t]) => [h('dt', { text: k }), h('dd', { class: `tone-${t}` }, svgIcon(TONE_ICON[t] || 'i-info'), h('span', { text: v }))])));
+    }
+    if (th && th.at) parts.push(h('p', { class: 'hint', text: `Aggiornato ${ago(th.at)}${th.lastCheck ? ` · ultima verifica ${ago(th.lastCheck.at)}` : ''}` }));
+    if (withActions) {
+      const verify = h('button', { type: 'button', class: 'btn small primary' }, svgIcon('i-pulse'), 'Verifica tutto');
+      verify.addEventListener('click', () => { showSection('health'); runVerify(); });
+      const healthBtn = h('button', { type: 'button', class: 'btn small' }, svgIcon('i-pulse'), 'Centro salute');
+      healthBtn.addEventListener('click', () => showSection('health'));
+      const logBtn = h('button', { type: 'button', class: 'btn small' }, svgIcon('i-list'), 'Cronologia');
+      logBtn.addEventListener('click', () => showSection('log'));
+      parts.push(h('div', { class: 'actions' }, verify, healthBtn, logBtn));
+    }
+    box.className = `card tab-card tone-${tone}`;
+    box.replaceChildren(...parts);
+  }
+
+  function renderTab() {
+    renderTabCard($('tabStatus'), true);
+    renderTabCard($('healthTab'), false);
+    renderProblems();
+    const p = tabHealth && tabHealth.player;
+    const bad = p && ['stalled', 'error', 'fatal', 'unsupported'].includes(p.state);
+    $('navHealthDot').hidden = !bad;
+  }
+
+  function renderProblems() {
+    const p = tabHealth && tabHealth.player;
+    const items = [];
+    if (p && p.lastError) items.push(['Errore del video', `${p.lastError.label} — motivo noto (dal browser): ${p.lastError.text}`, p.lastError.at, 'Se si ripete, ricarica la pagina.']);
+    if (p && p.lastNext && p.lastNext.result === 'failed') items.push(['Prossimo episodio', `Non riuscito: ${p.lastNext.reason}. Motivo probabile: il sito ha cambiato il pulsante o qualcosa lo copre.`, p.lastNext.at, 'Premi "prossimo episodio" sul player; se succede sempre, vedi Problemi comuni nel README.']);
+    if (p && p.nextIssue && !(p.lastNext && p.lastNext.result === 'failed')) items.push(['Prossimo episodio', 'Pulsante non trovato nel player. Motivo probabile: il sito è cambiato.', p.at, 'Il cambio automatico non potrà scattare: cambia episodio a mano.']);
+    if (p && p.lastRecovery) items.push(['Ripresa dello streaming', `${p.lastRecovery.action}: ${p.lastRecovery.result}`, p.lastRecovery.at,
+      /impossibil|non ripetuta|non è ripartito/.test(p.lastRecovery.result) ? 'Ricarica la pagina a mano.' : '']);
+    const box = $('hcProblems');
+    if (!items.length) {
+      box.replaceChildren(h('p', { class: 'empty', text: p ? 'Nessun problema rilevato in questo episodio.' : 'Nessun dato: apri un episodio o premi Verifica tutto.' }));
+      return;
+    }
+    box.replaceChildren(h('ul', { class: 'problems' }, items.map(([fn, text, at, action]) => h('li', {},
+      h('div', { class: 'problem-head' }, h('b', { text: fn }), h('span', { class: 'date', text: at ? ago(at) : '' })),
+      h('p', { text }),
+      action ? h('p', { class: 'hint', text: `Cosa fare: ${action}` }) : null))));
+  }
+
+  // ----- Verifica tutto -----
+
+  async function runVerify() {
+    if (verifying) return;
+    verifying = true;
+    $('verifyAll').disabled = true;
+    $('verifyAll').lastChild.textContent = 'Verifica in corso…';
+    await loadTabHealth();
+    const tabId = tabHealth && tabIsOther ? tabHealth.tabId : activeTabId;
+    const res = await chrome.runtime.sendMessage({ type: 'kwVerifyAll', tabId }).catch((e) => ({ ok: false, error: e.message }));
+    verifying = false;
+    $('verifyAll').disabled = false;
+    $('verifyAll').lastChild.textContent = 'Verifica tutto';
+    if (!res || !res.ok) {
+      $('hcSummary').hidden = false;
+      $('hcSummary').replaceChildren(badge('error', `Verifica non eseguita: ${(res && res.error) || 'errore sconosciuto'}`));
+      return;
+    }
+    X.healthLast = res.result;
+    renderHealthResult(true);
+    await loadTabHealth();
+    renderTab();
+  }
+  $('verifyAll').addEventListener('click', runVerify);
+
+  const DETAIL_TAG = { off: 'Disattivata da te', idle: 'Non attiva adesso', unsupported: 'Non supportata qui', error: 'In errore', unverified: 'Non provata', verified: 'Verificata' };
+
+  function renderHealthResult(fresh) {
+    const r = X.healthLast;
+    // Il risultato vale per la scheda in cui è stato fatto.
+    const relevant = r && (fresh || (tabHealth && r.tabId === tabHealth.tabId) || r.tabId === activeTabId);
+    $('hcLast').textContent = r ? `Ultimo controllo: ${fmtDateTime(r.at)}` : 'Mai eseguita';
+    if (!relevant) {
+      $('hcSummary').hidden = true;
+      $('hcList').replaceChildren();
+      return;
+    }
+    const sm = r.summary;
+    // "Non disponibile" solo perché spenta da te o non attiva adesso non è un problema.
+    const naOk = r.checks.filter((c) => c.status === 'na').every((c) => ['off', 'idle'].includes(c.detail));
+    if (sm.overall === 'partial' && naOk) sm.overall = sm.check ? 'check' : 'ok';
+    const overall = { ok: ['ok', 'Tutto quello che si può verificare adesso funziona'], check: ['wait', 'Niente in errore; alcune funzioni si potranno verificare solo quando scattano'],
+      partial: ['warn', 'Alcune funzioni non sono disponibili qui (spente o non supportate)'], error: ['error', 'C\'è almeno un problema: vedi le voci in errore'] }[sm.overall];
+    $('hcSummary').hidden = false;
+    $('hcSummary').replaceChildren(
+      badge(overall[0], overall[1]),
+      h('div', { class: 'hc-counts' },
+        h('span', { class: 'count tone-ok' }, svgIcon('i-check'), `${sm.ok} Funzionante`),
+        h('span', { class: 'count tone-wait' }, svgIcon('i-clock'), `${sm.check} Da verificare`),
+        h('span', { class: 'count tone-off' }, svgIcon('i-minus'), `${sm.na} Non disponibile`)));
+    $('hcList').replaceChildren(...r.checks.map((c) => {
+      const tone = c.detail === 'error' ? 'error' : STATUS_TONE[c.status];
+      const d = h('details', { class: `hc-item tone-${tone}` },
+        h('summary', {}, svgIcon(c.detail === 'error' ? 'i-x' : STATUS_ICON[c.status]), h('span', { class: 'hc-label', text: c.label }),
+          h('span', { class: 'hc-status', text: H.CHECK[c.status] }),
+          c.detail ? h('span', { class: `tag ${c.detail === 'error' ? 'err' : ''}`, text: DETAIL_TAG[c.detail] || c.detail }) : null),
+        h('p', { text: c.text }));
+      if (c.detail === 'error') d.open = true;
+      return h('li', {}, d);
+    }));
+  }
+
+  // ----- Cronologia -----
+
+  const LEVEL_TONE = { info: 'off', warn: 'warn', error: 'error' };
+  const LEVEL_ICON = { info: 'i-info', warn: 'i-alert', error: 'i-x' };
+  const CAT_LABEL = { extension: 'Estensione', site: 'Sito', player: 'Player', next: 'Episodi', skip: 'Salti', recovery: 'Ripresa', health: 'Verifica', settings: 'Impostazioni' };
+
+  function renderLog() {
+    const log = H.validLog(X.eventLog);
+    setSeg($('logFilter'), logFilter);
+    const shown = log.events.filter((e) => logFilter === 'all' || (logFilter === 'warn' ? e.level !== 'info' : e.level === 'error')).reverse();
+    $('logCount').textContent = `${shown.length} di ${log.events.length}`;
+    $('logEmpty').hidden = shown.length > 0;
+    $('logEmpty').textContent = log.events.length ? 'Nessun evento con questo filtro.' : 'Ancora nessun evento: si registrano mentre guardi.';
+    $('logList').replaceChildren(...shown.slice(0, 300).map((e) => h('li', { class: `log-item tone-${LEVEL_TONE[e.level]}` },
+      svgIcon(LEVEL_ICON[e.level]),
+      h('div', { class: 'log-body' },
+        h('div', { class: 'log-head' },
+          h('span', { class: 'log-msg', text: e.msg }),
+          e.count > 1 ? h('span', { class: 'tag', text: `×${e.count}`, title: `Ultima volta: ${fmtDateTime(e.lastAt)}` }) : null),
+        h('div', { class: 'log-meta' },
+          h('span', { text: fmtDateTime(e.at) }),
+          h('span', { text: CAT_LABEL[e.cat] || e.cat }),
+          e.fn ? h('span', { text: e.fn }) : null),
+        e.action || e.result ? h('div', { class: 'log-detail', text: [e.action, e.result].filter(Boolean).join(' → ') }) : null))));
+  }
+
+  $('logFilter').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-value]');
+    if (!b) return;
+    logFilter = b.dataset.value;
+    renderLog();
+  });
+  $('logExport').addEventListener('click', () => {
+    const log = H.validLog(X.eventLog);
+    download(`keep-watching-cronologia-${KWStats.dayKey(Date.now())}.json`, JSON.stringify(H.logToJSON(log, Date.now(), VERSION), null, 2), 'application/json');
+    const p = $('logResult');
+    p.hidden = false;
+    p.className = 'hint ok';
+    p.textContent = `File esportato con ${log.events.length} eventi.`;
+  });
+  $('logClear').addEventListener('click', () => { $('logClearConfirm').hidden = false; });
+  $('logClearCancel').addEventListener('click', () => { $('logClearConfirm').hidden = true; });
+  $('logClearGo').addEventListener('click', async () => {
+    $('logClearConfirm').hidden = true;
+    const res = await chrome.runtime.sendMessage({ type: 'kwLogClear' }).catch(() => null);
+    const p = $('logResult');
+    p.hidden = false;
+    p.className = res && res.ok ? 'hint ok' : 'hint error';
+    p.textContent = res && res.ok ? 'Cronologia cancellata.' : 'Cancellazione non riuscita: riprova.';
+  });
+
   // ---------- Link esterni (unico punto di configurazione: KW_LINKS) ----------
 
   function renderLinks() {
@@ -832,7 +1088,7 @@
     const raw = await chrome.storage.local.get({ ...KW_DEFAULTS, ...EXTRA_DEFAULTS });
     S = kwSanitize(raw);
     for (const k of Object.keys(EXTRA_DEFAULTS)) X[k] = raw[k];
-    try { nowPlaying = (await chrome.storage.session.get('nowPlaying')).nowPlaying || null; } catch (e) { nowPlaying = null; }
+    await loadTabHealth();
     render();
   }
 
@@ -850,14 +1106,20 @@
     renderWhatsNew();
     renderStats();
     renderUpdates();
+    renderTab();
+    renderHealthResult(false);
+    renderLog();
   }
+
+  // I tempi relativi ("12 s fa") restano veri mentre il menu è aperto.
+  setInterval(() => { if (!document.hidden) renderTab(); }, 15000);
 
   let resizeTimer = 0;
   window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(renderStats, 150); });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local') load();
-    if (area === 'session' && changes.nowPlaying) { nowPlaying = changes.nowPlaying.newValue || null; renderOverview(); }
+    if (area === 'session' && Object.keys(changes).some((k) => k.startsWith('health:'))) loadTabHealth().then(renderTab);
   });
 
   $('version').textContent = `v${VERSION}`;

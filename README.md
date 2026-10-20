@@ -1,8 +1,8 @@
 # Keep_Watching
 
-Estensione per Brave e Chrome che su StreamingCommunity passa da sola all'episodio successivo quando quello corrente finisce, e lo fa partire con l'audio. Salta l'intro e i titoli di coda serie per serie, ha un timer di spegnimento, fa ripartire lo streaming quando si blocca e tiene statistiche di visione solo sul tuo computer.
+Estensione per Brave e Chrome che su StreamingCommunity passa da sola all'episodio successivo quando quello corrente finisce, e lo fa partire con l'audio. Salta l'intro e i titoli di coda serie per serie, ha un timer di spegnimento, fa ripartire lo streaming quando si blocca e tiene statistiche di visione solo sul tuo computer. Quando qualcosa non va, il **Centro salute** dice cosa funziona davvero e la **Cronologia** cosa è successo.
 
-Versione 1.4.1
+Versione 1.5.0
 
 > **Importante:** il browser lascia partire l'audio da solo solo dopo un tuo click sulla pagina. Apri l'episodio e premi play una volta: da lì in poi fa tutto l'estensione.
 
@@ -25,10 +25,21 @@ Versione 1.4.1
 - **Resta a schermo intero:** se guardi a schermo intero, ci resti anche nell'episodio successivo. Si esce con **Esc**.
 - **Se lo streaming si blocca:** dopo 12 secondi fermo l'estensione fa un salto di 1 secondo; se non basta, ricarica l'episodio e lo riporta al secondo in cui eri.
 - **Pausa quando cambi scheda** (facoltativa): il video si ferma e riparte quando torni.
-- **Notifiche sul desktop:** serie finita, limite di episodi raggiunto, timer di spegnimento, streaming bloccato. Toccando la notifica si torna alla scheda.
+- **Notifiche sul desktop:** serie finita, limite di episodi raggiunto, timer di spegnimento, streaming bloccato, cambio episodio non riuscito. Toccando la notifica si torna alla scheda.
+- **Centro salute e Verifica tutto:** per la scheda che stai guardando mostra cosa funziona, cosa si potrà verificare solo quando scatta e cosa non è disponibile (e perché), senza toccare il video.
+- **Cronologia eventi:** cosa è successo (player rilevato, cambi di episodio, salti, blocchi, tentativi di ripresa ed esito, errori), solo sul tuo computer, esportabile e cancellabile.
+- **Ripresa con esito verificato:** un tentativo è "riuscito" solo se il video torna davvero ad avanzare; i tentativi sono pochi e contati, poi l'estensione ti dice cosa fare.
 - **Il dominio del sito può cambiare:** l'estensione non dipende dal dominio principale (`.fun`, `.xyz`…), ma dal percorso delle pagine e dal dominio del player.
 
-Funziona su Brave e Chrome per computer. Non ha telemetria: impostazioni e statistiche restano nello spazio del browser. L'unica richiesta di rete è il controllo degli aggiornamenti verso GitHub, quando premi **Cerca aggiornamento** o, se lo lasci attivo, una volta al giorno all'apertura del menu.
+Funziona su Brave e Chrome per computer (Edge e altri browser Chromium non sono stati provati; Firefox non è supportato). Non ha telemetria: impostazioni e statistiche restano nello spazio del browser. L'unica richiesta di rete è il controllo degli aggiornamenti verso GitHub, quando premi **Cerca aggiornamento** o, se lo lasci attivo, una volta al giorno all'apertura del menu.
+
+## Siti supportati
+
+| Sito | Player | Stato |
+|---|---|---|
+| StreamingCommunity (qualsiasi dominio, riconosciuto dalla struttura delle pagine `/watch/` e `/iframe/`) | vixcloud.co (JW Player 8) | Funzioni di base (permesso di autoplay, cambio episodio, avvio con audio) verificate sul sito reale durante lo sviluppo; le altre verificate su un sito di prova con la stessa struttura. Le novità della 1.5.0 (verifica del cambio, Centro salute, cronologia) non sono ancora state provate sul sito reale |
+
+Nessun altro sito è supportato. Il dettaglio per ogni funzione, con i guasti possibili e i piani di ripresa, è in **[docs/COMPATIBILITA.md](docs/COMPATIBILITA.md)**.
 
 ## Cosa ti serve
 
@@ -40,7 +51,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 ## 1. Carica il progetto su GitHub
 
 1. Crea un nuovo repository, per esempio `Keep_Watching`. Deve essere **pubblico** perché **Cerca aggiornamento** funzioni: GitHub risponde senza accesso solo per i repository pubblici. Se lo vuoi privato l'estensione funziona lo stesso, ma il controllo degli aggiornamenti dirà "Repository non trovato o privato".
-2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.4.1.zip` e le cartelle devono stare al primo livello.
+2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.5.0.zip` e le cartelle devono stare al primo livello.
 
 `version.json` e lo zip nella radice sono quello che legge **Cerca aggiornamento**. Se un giorno pubblichi le versioni come **release** di GitHub (con lo zip allegato), l'estensione usa quelle.
 
@@ -48,7 +59,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 
 ### 2.1 Estrai lo zip
 
-1. Scarica `Keep_Watching-1.4.1.zip` (dal repository, oppure dalla cartella del progetto).
+1. Scarica `Keep_Watching-1.5.0.zip` (dal repository, oppure dalla cartella del progetto).
 2. Estrailo con **Estrai qui**: ottieni la cartella `Keep_Watching`, con dentro `manifest.json`.
 3. Mettila in un posto dove resta: il browser carica l'estensione da lì ogni volta. Se la cancelli, l'estensione smette di funzionare.
 
@@ -73,7 +84,7 @@ Durante l'installazione il browser avvisa che l'estensione può **leggere e modi
 | Pagine `*/watch/*` e `*/iframe/*` | Dare al player il permesso di autoplay, schermo intero tra episodi, ricarica dello streaming bloccato |
 | Player `vixcloud.co/embed/*` | Controllare il player |
 
-Le versioni 1.4 non aggiungono permessi: il controllo degli aggiornamenti usa l'API pubblica di GitHub, che risponde a qualsiasi pagina, e l'esportazione delle statistiche usa il normale download del browser.
+Le versioni 1.4 e 1.5 non aggiungono permessi: il controllo degli aggiornamenti usa l'API pubblica di GitHub, che risponde a qualsiasi pagina, l'esportazione usa il normale download del browser, e **Verifica tutto** raccoglie le risposte delle pagine dell'episodio senza chiedere di leggere le tue schede (niente permessi `tabs` o `webNavigation`).
 
 ### 2.4 Scorciatoie
 
@@ -94,6 +105,8 @@ Il browser non assegna una combinazione se è già usata da un'altra estensione:
 1. Apri un episodio, apri gli strumenti per sviluppatori dal menu del browser (**Altri strumenti › Strumenti per sviluppatori**) e, nella scheda **Sources**, premi **Ctrl+F8**: senza questo passaggio il player si chiude con "Connessione negata da vixcloud.co" (vedi **Problemi comuni**).
 2. Nella scheda **Console** scrivi `Keep_Watching` nel campo filtro e ricarica la pagina.
 3. Deve comparire `[Keep_Watching] Player caricato con permesso: autoplay; fullscreen`. Se c'è, l'estensione è attiva sul player.
+
+Più semplice: con l'episodio aperto, apri il menu di Keep_Watching, vai in **Centro salute** e premi **Verifica tutto**. Le voci devono essere **Funzionante**, salvo quelle che si possono verificare solo quando scattano (il cambio episodio la prima volta, il salto dei titoli) e quelle che hai spento tu.
 
 ## 3. Aggiorna a una nuova versione
 
@@ -130,10 +143,12 @@ Si apre cliccando l'icona di Keep_Watching. Le modifiche valgono subito, anche s
 
 | Sezione | Cosa contiene |
 |---|---|
-| **Panoramica** | Interruttore generale, cosa c'è sul player, profilo, timer, episodi di fila, avviso di aggiornamento, accesso rapido |
+| **Panoramica** | Interruttore generale, stato della scheda (sito, player, prossimo episodio, ripresa), profilo, timer, episodi di fila, avviso di aggiornamento, accesso rapido |
 | **Riproduzione** | Cambio episodio, conto alla rovescia, limite di episodi, intro e titoli, serie salvate, salto avanti, timer, recupero dello streaming, scorciatoie |
 | **Interfaccia sul video** | Popup sul video per categoria, aspetto della barra con anteprima, notifiche sul desktop |
 | **Profili** | Normale, Notturno, Maratona, Manuale |
+| **Centro salute** | Stato reale della scheda, **Verifica tutto**, ultimi problemi con il motivo e cosa fare |
+| **Cronologia** | Eventi diagnostici, filtri per gravità, esportazione e cancellazione |
 | **Statistiche** | Riepilogo, grafico giornaliero, esportazione e importazione, azzeramento |
 | **Aggiornamenti** | Versione installata e ultima pubblicata, **Cerca aggiornamento**, novità, registro delle versioni |
 | **Sostieni** | Il link per offrire un caffè su Ko-fi |
@@ -248,6 +263,46 @@ Il riepilogo è per **oggi**, **7 giorni** o **30 giorni**; il grafico mostra il
 - **Importa** (dal menu aperto in una scheda): **Unisci** tiene per ogni giorno il valore più alto, così reimportare lo stesso file non raddoppia nulla; **Sostituisci** cancella lo storico e lo rimpiazza, dopo una conferma. I file non validi vengono rifiutati senza toccare niente.
 - **Azzera statistiche** chiede conferma e non tocca impostazioni, profili, timer e scorciatoie.
 
+### Centro salute e Verifica tutto
+
+In **Centro salute** (e in breve nella **Panoramica**) trovi lo stato della scheda che stai guardando: sito riconosciuto, stato del player (in caricamento, in riproduzione, in pausa, caricamento dati, bloccato, recupero in corso, cambio episodio, serve un'azione, non compatibile), prossimo episodio, ripresa dello streaming e l'ultimo errore. Lo stato resta anche chiudendo il menu. Se apri il menu in una scheda, mostra l'ultima scheda con un episodio e lo dice.
+
+**Verifica tutto** controlla, senza cambiare episodio, senza saltare, senza mettere in pausa e senza ricaricare: sito, iframe dell'episodio e permesso di autoplay, player, controlli di JW Player, prossimo episodio, salto intro, salto titoli, ripresa dello streaming, memoria dell'estensione ed errori dell'ultima ora. Ogni voce ha uno di tre esiti:
+
+| Esito | Cosa vuol dire |
+|---|---|
+| **Funzionante** | Verificato adesso, oppure già visto funzionare in questa scheda (per esempio il cambio che ha portato all'episodio in corso) |
+| **Da verificare** | Presente e pronto, ma si saprà se funziona solo quando scatta. Il cambio episodio è "da verificare" finché non ne avviene uno: trovare il pulsante non basta |
+| **Non disponibile** | Spento da te, non supportato da questa pagina, oppure in errore: il dettaglio dice quale dei tre |
+
+Gli errori si aprono da soli con la spiegazione. Il motivo è **noto** quando lo dice il browser (per esempio "Errore di rete, codice 2") e **probabile** quando si deduce da ciò che manca (un pulsante non trovato fa pensare a un cambio del sito).
+
+### Cronologia eventi
+
+**Cronologia** elenca, dal più recente: avvio dell'estensione, pagina riconosciuta o no, player rilevato o assente, conto alla rovescia, cambio episodio e suo esito, salto dell'intro e dei titoli, blocchi dello streaming (con il tipo: buffering prolungato o tempo fermo), tentativi di ripresa e loro esito, errori del video, avvii bloccati dal browser, risultati di **Verifica tutto**.
+
+- Gli eventi uguali entro 10 minuti diventano una riga sola con il conteggio (×N): un player bloccato non riempie l'elenco.
+- Si tengono gli ultimi 300 eventi; i più vecchi si cancellano da soli.
+- Nessun indirizzo completo, token o cookie: degli indirizzi restano solo host e percorso. Il titolo della serie compare nei messaggi del player, solo sul tuo computer.
+- **Esporta JSON** salva un file da allegare a una segnalazione; **Cancella cronologia** chiede conferma e non tocca impostazioni e statistiche.
+
+### Come si riprende la riproduzione
+
+L'estensione segue lo stato reale del player e prova a risolvere da sola solo ciò che si può risolvere senza rischi:
+
+| Problema | Cosa fa l'estensione | Se non basta |
+|---|---|---|
+| Il player è lento a caricarsi | Aspetta fino a 30 secondi | Segna il player come non compatibile e lo scrive in cronologia |
+| Buffering o tempo fermo per 12 secondi (video non in pausa) | Salto di 1 secondo | Ricarica dell'episodio dal secondo in cui eri (una per episodio, una ogni 3 minuti) |
+| Dopo la ricarica il video non riparte entro 20 secondi | — | Lo segnala come recupero fallito |
+| Errore del video dopo l'avvio | Ricarica dell'episodio | Avviso: ricarica la pagina |
+| Errore del video prima che sia mai partito | Nessun tentativo (rischierebbe di ripetersi a vuoto) | Avviso: ricarica la pagina |
+| Il browser blocca l'avvio anche senza audio | Nessun tentativo: la regola del browser va rispettata | Avviso: premi play |
+| Il clic su "prossimo episodio" non cambia episodio | Un secondo clic dopo 15 secondi | Riquadro "Cambio episodio non riuscito" con **Riprova** e notifica |
+| Il pulsante "prossimo episodio" manca o è disattivato | Lo aspetta 3 secondi | Notifica "pulsante non trovato" |
+
+Le pause decise da te non sono mai considerate blocchi.
+
 ### Schermo intero tra un episodio e l'altro
 
 Il browser concede lo schermo intero vero solo dopo un tuo click, e a ogni episodio il player viene ricreato. Per questo, se al cambio episodio stai guardando a schermo intero, l'estensione mette a schermo intero la **finestra** del browser (come F11) e allarga il player a tutta la finestra: il risultato è lo stesso.
@@ -285,6 +340,9 @@ La guida tecnica (come è fatto il sito, perché l'estensione funziona così, pu
 
 ## Problemi comuni
 
+Prima di tutto: apri il menu in **Centro salute**, premi **Verifica tutto** e guarda le voci in errore e gli **Ultimi problemi**; in **Cronologia** filtra **Solo errori**. Spesso il motivo è già scritto lì.
+
+
 - **"Connessione negata da vixcloud.co" aprendo gli strumenti per sviluppatori:** il player ha una protezione contro gli strumenti per sviluppatori. Nella scheda **Sources** premi **Ctrl+F8** e ricarica la pagina. Anche F12 viene bloccato: apri gli strumenti dal menu del browser.
 - **Il player mostra una pagina di errore o non si carica:** probabilmente il sito ha cambiato il percorso delle pagine (`/watch/`, `/iframe/`) e l'estensione non riesce più a dare il permesso al player. Sospendi l'estensione (Alt+Shift+K) per guardare e vedi `docs/MANUTENZIONE.md`.
 - **A fine episodio non succede niente:** controlla che **Estensione attiva** e **Prossimo episodio automatico** siano accesi, che il profilo non sia **Manuale** e che l'icona non mostri **OFF**. Se arriva la notifica **pulsante non trovato**, il sito ha cambiato la barra del player.
@@ -302,20 +360,51 @@ La guida tecnica (come è fatto il sito, perché l'estensione funziona così, pu
 - **Le statistiche sembrano basse:** contano solo il tempo in cui il video avanza davvero; pause, caricamenti e salti non contano. Controlla anche che **Raccogli statistiche** sia acceso.
 - **Non riesco a importare le statistiche dal popup:** la scelta del file chiuderebbe il popup. Premi **Importa da una scheda**.
 - **Non arrivano le notifiche:** controlla **Notifiche sul desktop** nel menu e, in Windows, **Impostazioni › Sistema › Notifiche** per Brave.
+- **"Cambio episodio non riuscito" sul player:** il clic su "prossimo episodio" non ha avuto effetto due volte. Premilo tu o ricarica la pagina. Se succede sempre, il sito ha cambiato il pulsante: segnalalo con la cronologia esportata.
+- **Centro salute dice "Nessun episodio in questa scheda" mentre guardi:** la pagina è appena stata aperta (aspetta qualche secondo) oppure il sito ha cambiato i percorsi `/watch/` e `/iframe/`: premi **Verifica tutto**.
+- **Verifica tutto dice "Player non compatibile" o "pagina dell'episodio senza player":** il sito mostra una pagina di errore o ha cambiato player. Ricarica la pagina; se resta così, l'estensione va aggiornata.
 - **Nella console compare "A listener indicated an asynchronous response…":** non viene da Keep_Watching, i cui messaggi iniziano sempre con `[Keep_Watching]`. Viene da un'altra estensione installata.
 - **Dopo l'aggiornamento l'estensione non cambia:** ricarica l'estensione in `brave://extensions` e poi la pagina dell'episodio. Se la nuova versione ha permessi nuovi, rimuovila e caricala di nuovo.
+
+## Raccogliere una diagnostica utile
+
+Se qualcosa non funziona e vuoi segnalarlo:
+
+1. Riproduci il problema con l'episodio aperto.
+2. Apri il menu in **Centro salute** e premi **Verifica tutto**.
+3. Vai in **Cronologia** e premi **Esporta JSON**.
+4. Allega il file alla segnalazione, insieme alla versione (in alto a sinistra nel menu) e al browser che usi.
+
+Il file contiene solo gli eventi: niente cookie, token o indirizzi completi. Contiene il nome della serie e dell'episodio se compaiono nei messaggi: controllalo prima di condividerlo.
+
+## Limiti noti
+
+- Funziona solo con StreamingCommunity e il player vixcloud.co. Se il sito cambia struttura, il Centro salute lo segnala, ma l'estensione va aggiornata.
+- L'estensione non vede gli errori interni del player (hls.js, JW Player), solo i loro effetti sul video; non si accorge di un'immagine ferma se il tempo continua ad avanzare.
+- Intro e titoli si riconoscono solo dai tempi che segni tu: l'estensione non analizza le immagini. Due serie con lo stesso titolo condividono i segni.
+- Il primo avvio con audio richiede un tuo click: è una regola del browser e non viene aggirata.
+- Con la scheda nascosta il browser rallenta i timer: verifiche e recuperi possono arrivare in ritardo.
+- Le novità della 1.5.0 sono state provate su un sito di prova, non ancora sul sito reale.
+
+## Sviluppo e test
+
+- Test delle librerie (Node.js 18+, nessuna dipendenza): `node tests/run.js`.
+- Test end-to-end su un sito di prova (Python 3, Playwright con Chromium, ffmpeg, `xvfb-run` senza schermo): `tests/e2e/run_all.sh`.
+- Icone: `python tools/make_icons.py` (serve Pillow).
+- Dettagli su architettura, test, checklist manuale e punti fragili: [docs/MANUTENZIONE.md](docs/MANUTENZIONE.md); compatibilità e piani di ripresa: [docs/COMPATIBILITA.md](docs/COMPATIBILITA.md).
 
 ## Struttura dei file
 
 ```
-Keep_Watching-1.4.1.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
+Keep_Watching-1.5.0.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
 version.json                 ultima versione pubblicata, letta da "Cerca aggiornamento"
 manifest.json                configurazione dell'estensione (Manifest V3)
 rules.json                   regola di rete: blocca il primo caricamento del player senza permesso di autoplay
-src/background.js            badge, scorciatoie, notifiche, schermo intero della finestra, statistiche, migrazione
+src/background.js            badge, scorciatoie, notifiche, schermo intero, statistiche, cronologia, Verifica tutto, migrazione
 src/defaults.js              opzioni di serie, validazione, profili, categorie di popup, scorciatoie, link
 src/lib/stats.js             statistiche: misura, sessioni, riepiloghi, CSV e JSON, importazione
 src/lib/updates.js           controllo degli aggiornamenti su GitHub e confronto delle versioni
+src/lib/health.js            stati del player, tentativi, verifiche, cronologia eventi
 src/player.js                player: cambio episodio, intro e titoli, timer, salto avanti, streaming bloccato, avvio
 src/panel.js                 riquadro e avvisi sul player, tema e aspetto
 src/toolbar.js               barra di pulsanti sul player
@@ -323,19 +412,22 @@ src/guide.js                 guida alle scorciatoie sul player
 src/autoplay-permission.js   pagine del sito: permesso di autoplay al player
 src/cinema.js                pagine del sito: player a tutta finestra tra un episodio e l'altro
 src/recovery.js              pagine del sito: ricarica dell'episodio quando lo streaming si blocca
+src/site-health.js           pagine del sito: riconoscimento della struttura e risposte a "Verifica tutto"
 src/popup/                   menu dell'icona (HTML, CSS, JS)
 icons/                       icone 16, 32, 48 e 128 px
 tests/run.js                 test automatici delle librerie (Node.js, senza dipendenze)
-tests/unit/                  test di impostazioni, statistiche e aggiornamenti
+tests/unit/                  test di impostazioni, statistiche, aggiornamenti, stati e cronologia
 tests/e2e/                   test end-to-end su un sito di prova (Python, Playwright, Chromium)
 tools/make_icons.py          rigenera le icone (serve Pillow)
 tools/package.ps1            crea lo zip di installazione e version.json su Windows e aggiorna il README
 tools/package.sh             lo stesso per Linux, macOS e Git Bash
 docs/MANUTENZIONE.md         guida tecnica, debug, punti fragili, test e checklist
+docs/COMPATIBILITA.md        siti supportati, audit, matrice dei guasti, piani di ripresa
+docs/icona.png               icona in grande (512 px)
 CHANGELOG.md                 novità di ogni versione
 ```
 
-L'estensione non usa librerie esterne. L'unica richiesta di rete propria è il controllo degli aggiornamenti verso `api.github.com`, senza cookie e senza dati personali.
+L'estensione non usa librerie esterne. L'unica richiesta di rete propria è il controllo degli aggiornamenti verso `api.github.com`, senza cookie e senza dati personali. Statistiche e cronologia restano nel browser.
 
 ## Donazioni
 
@@ -344,6 +436,6 @@ Keep_Watching è gratis e senza funzioni a pagamento. Se ti è utile, puoi offri
 ## Crediti e licenze
 
 - Codice: licenza MIT (file `LICENSE`).
-- Icona disegnata da `tools/make_icons.py`, nel verde del player del sito.
+- Icona (anello viola-azzurro con freccia e play) disegnata da `tools/make_icons.py` sul modello fornito dall'autore.
 - Icone del menu disegnate a mano in SVG nel file del menu.
 - Progetto personale, non affiliato a StreamingCommunity né a JW Player. L'estensione automatizza i controlli del player senza modificare i contenuti del sito.

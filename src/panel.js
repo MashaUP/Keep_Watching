@@ -13,8 +13,8 @@
 const KW_PLAYER_THEME = `
   :host {
     all: initial;
-    --kw-blue: #2f74ff;
-    --kw-blue-hover: #4a87ff;
+    --kw-blue: #5b63f0;
+    --kw-blue-hover: #6f77f5;
     --kw-green: #19ad79;
     --kw-amber: #f2a93b;
     --kw-red: #ef5350;
@@ -76,7 +76,8 @@ const KW_PANEL_CSS = `
   @keyframes kw-in { from { opacity: 0; transform: translateY(6px); } }
   .head { display: flex; align-items: center; gap: 10px; }
   .icon { flex: none; display: grid; place-items: center; width: 1.7em; height: 1.7em; border-radius: 50%;
-    background: rgba(47, 116, 255, 0.18); color: var(--kw-blue); font-weight: 700; }
+    background: rgba(91, 99, 240, 0.22); color: #a3aaff; font-weight: 700; }
+  .icon svg { width: 1.05em; height: 1.05em; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
   .icon.ok { background: rgba(25, 173, 121, 0.18); color: var(--kw-green); }
   .icon.warn { background: rgba(242, 169, 59, 0.18); color: var(--kw-amber); }
   .title { font-weight: 650; font-size: 1.05em; overflow-wrap: anywhere; }
@@ -86,6 +87,29 @@ const KW_PANEL_CSS = `
   .bar > i { display: block; width: 100%; height: 100%; background: var(--kw-blue); transform-origin: left; }
   .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 `;
+
+// Icone dei riquadri (vettoriali, 24×24, tratto): niente emoji o caratteri al posto delle icone.
+const KW_PANEL_ICONS = {
+  next: 'M6 5l9 7-9 7zM18 5v14',
+  ok: 'M5 12.5l4.5 4.5L19 7.5',
+  warn: 'M12 4l9 16H3zM12 10v4.5M12 17.5v.5',
+  sleep: 'M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z',
+  question: 'M9.2 9a2.9 2.9 0 1 1 4.3 2.5c-.9.5-1.5 1.1-1.5 2.2v.6M12 17.5v.5',
+  info: 'M12 11v6M12 7.5v.5'
+};
+// Valori usati fino alla 1.4.1 (caratteri) → nome dell'icona.
+const KW_PANEL_ICON_ALIASES = { '▶': 'next', '✓': 'ok', '⏾': 'sleep', '?': 'question', i: 'info' };
+
+function kwPanelIcon(name) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', KW_PANEL_ICONS[KW_PANEL_ICON_ALIASES[name] || name] || KW_PANEL_ICONS.info);
+  svg.append(path);
+  return svg;
+}
 
 const KW_TOAST_CSS = `
   .toast {
@@ -157,7 +181,7 @@ function kwCreatePanel(getContainer, getSettings) {
       ${countdown ? '<div class="bar"><i></i></div>' : ''}
       <div class="actions"></div>`;
     const iconEl = box.querySelector('.icon');
-    iconEl.textContent = icon;
+    iconEl.append(kwPanelIcon(icon));
     if (tone) iconEl.classList.add(tone);
     box.querySelector('.title').textContent = title;
     const textEl = box.querySelector('.text');
