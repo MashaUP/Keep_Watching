@@ -3,6 +3,17 @@
 Tutte le modifiche rilevanti del progetto sono elencate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e le versioni seguono il [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.6.0] - 2026-10-24
+
+### Aggiunto
+- **Collegamenti ufficiali** in un'unica fonte (`src/lib/links.js`): GitHub, Discord, Ko-fi e guida come piccole icone in basso a sinistra nel menu e nell'elenco "Community e aiuto" della sezione Sostieni. Pagine per segnalare problemi e proporre funzioni predisposte ma spente finché non vengono confermate.
+- **Collegamenti aggiornabili senza nuova versione**: il menu legge `links.json` dal repository GitHub (al massimo ogni 12 ore, o con "Cerca aggiornamento"). Solo dati, validati campo per campo; indirizzi solo `https` su domini noti; con rete assente o file non valido si usano l'ultima configurazione valida o quella di serie.
+- **Parti anche con il browser ridotto a icona** (attivo di serie): con la scheda nascosta, se il nuovo episodio non parte o il player lo rimette in pausa, l'estensione riprova per circa un minuto (sei tentativi), poi avvisa e lo avvia al ritorno. Ogni esito finisce in cronologia.
+
+### Modificato
+- **Icona per la barra del browser** (16 e 32 px) senza quadrato di sfondo: l'anello occupa tutta l'icona e appare grande quanto quelle delle altre estensioni.
+- Indirizzi di Ko-fi e del repository nel menu presi dalla nuova fonte unica.
+
 ## [1.5.2] - 2026-10-20
 
 ### Corretto

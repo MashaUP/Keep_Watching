@@ -71,7 +71,24 @@ svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; s
 .nav nav button .dot { position: absolute; top: 9px; left: 24px; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 2px var(--nav); }
 .nav nav button[aria-current="page"] .dot { box-shadow: 0 0 0 2px var(--blue); }
 
-.nav-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding: 12px 14px; border-top: 1px solid var(--line); }
+.nav-links { display: flex; flex-wrap: wrap; gap: 2px; padding: 8px 12px; border-top: 1px solid var(--line); margin-top: auto; }
+.nav-links:empty { display: none; }
+.nav-links a { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--muted); }
+.nav-links a svg { width: 17px; height: 17px; }
+.nav-links a:hover { background: var(--panel); color: var(--text); }
+.nav-links a:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; color: var(--text); }
+.nav-links a[data-link="kofi"]:hover { color: var(--kofi); }
+.link-list { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.link-list li { border-top: 1px solid var(--line); }
+.link-list li:first-child { border-top: 0; }
+.link-list a { display: flex; align-items: center; gap: 10px; padding: 9px 2px; color: var(--text); text-decoration: none; }
+.link-list a:hover .link-label { color: var(--accent-text); }
+.link-list a > svg { color: var(--accent-text); }
+.link-list .link-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.link-list .link-label { font-weight: 600; }
+.link-list .link-desc { color: var(--muted); font-size: 12px; }
+.link-list .ext { width: 14px; height: 14px; color: var(--faint); }
+.nav-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .status-pill { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
 .status-pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
 .status-pill.on { color: var(--text); }
@@ -371,3 +388,4 @@ code { padding: 0 4px; border-radius: 4px; background: rgba(255, 255, 255, 0.07)
 .log-detail { margin-top: 3px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .nav nav button .dot.warn { background: var(--red); }
 #storageError { margin-bottom: 12px; }
+.nav-links:empty + .nav-foot { margin-top: auto; }

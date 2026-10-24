@@ -31,7 +31,7 @@
   const EXTRA_DEFAULTS = {
     streak: 0, lastAutoAt: 0, sleep: null, series: {}, stats: null,
     updateCheck: null, updateSeen: null, whatsNew: null, reloadRequest: null,
-    eventLog: null, healthLast: null
+    eventLog: null, healthLast: null, linksRemote: null
   };
 
   let S = kwSanitize({});
@@ -806,7 +806,7 @@
     $('checkUpdate').disabled = false;
     await set({ updateCheck: result });
   }
-  $('checkUpdate').addEventListener('click', () => checkUpdates({ manual: true }));
+  $('checkUpdate').addEventListener('click', () => { checkUpdates({ manual: true }); refreshLinks(true); });
 
   $('reloadExt').addEventListener('click', async () => {
     // Il codice nuovo è quello che hai estratto nella cartella: niente arriva da Internet.
@@ -1078,15 +1078,52 @@
     p.textContent = res && res.ok ? 'Cronologia cancellata.' : 'Cancellazione non riuscita: riprova.';
   });
 
-  // ---------- Link esterni (unico punto di configurazione: KW_LINKS) ----------
+  // ---------- Collegamenti ufficiali (unica fonte: src/lib/links.js + links.json) ----------
+  // Ogni indirizzo passa da KWLinks.resolve, che lo valida; un collegamento spento o non
+  // valido non compare affatto (niente pulsanti che non portano da nessuna parte).
+
+  let links = KWLinks.resolve(null);
+  let refreshingLinks = false;
+
+  const extLink = (l, attrs = {}, ...children) => h('a', {
+    href: l.url, target: '_blank', rel: 'noopener noreferrer', 'data-link': l.id, ...attrs
+  }, ...children);
 
   function renderLinks() {
-    const kofiOk = /^https:\/\/ko-fi\.com\/[A-Za-z0-9_]+$/.test(KW_LINKS.kofi || '');
+    const cache = X.linksRemote;
+    links = KWLinks.resolve(cache && cache.data);
+    const on = links.filter((l) => l.enabled);
+
+    // Barra di icone in basso a sinistra: piccole, con nome e descrizione come suggerimento.
+    $('navLinks').replaceChildren(...on.map((l) => extLink(l, { title: `${l.label}: ${l.description}`, 'aria-label': `${l.label} (si apre in una nuova scheda)` }, svgIcon(l.icon))));
+
+    // Sezione Sostieni: elenco con descrizione (Ko-fi ha già il suo pulsante sopra).
+    $('linkList').replaceChildren(...on.filter((l) => l.id !== 'kofi').map((l) => h('li', {},
+      extLink(l, {}, svgIcon(l.icon),
+        h('span', { class: 'link-text' }, h('span', { class: 'link-label', text: l.label }), h('span', { class: 'link-desc', text: l.description })),
+        svgIcon('i-external')))));
+    $('linksSource').textContent = cache && cache.data
+      ? `Collegamenti aggiornati dal repository il ${fmtDateTime(cache.okAt || cache.at)}.`
+      : 'Collegamenti di serie di questa versione.';
+
+    // Ko-fi (pulsante e riga in Panoramica) e indirizzo del repository negli Aggiornamenti.
+    const kofi = KWLinks.get(links, 'kofi');
     for (const a of $$('[data-kofi-link]')) {
-      if (kofiOk) { a.href = KW_LINKS.kofi; a.hidden = false; } else a.hidden = true;
+      if (kofi) { a.href = kofi.url; a.hidden = false; } else a.hidden = true;
     }
-    $('repoLink').href = KW_LINKS.repoUrl;
-    $('repoLink').textContent = KW_LINKS.repoUrl.replace(/^https:\/\//, '');
+    const gh = KWLinks.get(links, 'github');
+    $('repoLink').hidden = !gh;
+    if (gh) { $('repoLink').href = gh.url; $('repoLink').textContent = gh.url.replace(/^https:\/\//, ''); }
+  }
+
+  /** Rilegge links.json dal repository (al massimo ogni 12 ore, o subito se forced). */
+  async function refreshLinks(force = false) {
+    const last = X.linksRemote && X.linksRemote.checkedAt;
+    if (refreshingLinks || (!force && !KWLinks.due(X.linksRemote)) || (force && last && Date.now() - last < 60000)) return;
+    refreshingLinks = true;
+    const result = await KWLinks.fetchRemote((url, init) => fetch(url, init));
+    refreshingLinks = false;
+    await set({ linksRemote: KWLinks.nextCache(X.linksRemote, result) });
   }
 
   // ---------- Caricamento e aggiornamento ----------
@@ -1116,6 +1153,7 @@
     renderTab();
     renderHealthResult(false);
     renderLog();
+    renderLinks();
   }
 
   // I tempi relativi ("12 s fa") restano veri mentre il menu è aperto.
@@ -1142,5 +1180,7 @@
   load().then(() => {
     // Controllo automatico: al massimo uno al giorno, solo all'apertura del menu.
     if (S.updateAutoCheck && KWUpdates.dueForAutoCheck(X.updateCheck)) checkUpdates({ manual: false });
+    // Collegamenti dal repository: mai bloccanti, i valori di serie restano se la rete manca.
+    refreshLinks(false);
   });
 })();

@@ -11,7 +11,7 @@ sleep 1
 RUN=python3
 command -v xvfb-run > /dev/null && [ -z "${DISPLAY:-}" ] && RUN="xvfb-run -a python3"
 failed=0
-for t in test_regression test_quick_skip test_popups test_stats test_guide_ui test_popup test_health; do
+for t in test_regression test_quick_skip test_popups test_stats test_guide_ui test_popup test_health test_links; do
   echo "== $t"
   if $RUN "$t.py" > "/tmp/kw-$t.log" 2>&1; then
     echo "   superato ($(grep -c '✓' "/tmp/kw-$t.log") controlli)"

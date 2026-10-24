@@ -107,6 +107,10 @@
     return r;
   }
 
+  // ---------- Avvio con la scheda nascosta ----------
+  // Attese tra un tentativo e l'altro (ms): sei tentativi in circa 70 secondi, poi si smette.
+  const BACKGROUND_PLAY_DELAYS = [1500, 3000, 6000, 10000, 20000, 30000];
+
   // ---------- Errori del video ----------
 
   /** Codici di MediaError (HTML5): cosa vuol dire e se ha senso riprovare. */
@@ -223,7 +227,7 @@
   }
 
   const api = {
-    STATES, TRANSITIONS, nextState, createMachine, createRetry, classifyMediaError,
+    STATES, TRANSITIONS, nextState, createMachine, createRetry, classifyMediaError, BACKGROUND_PLAY_DELAYS,
     CHECK, DETAIL, check, summarize,
     LOG_MAX, LOG_GROUP_MS, LEVELS, CATEGORIES, cleanEvent, emptyLog, validLog, addEvent, logToJSON
   };

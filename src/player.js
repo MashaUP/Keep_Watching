@@ -1240,16 +1240,111 @@
     });
   }
 
-  // Se il video viene rimesso in pausa subito dopo l'avvio con la scheda nascosta,
-  // si riprova quando la scheda torna visibile.
+  // Se il video viene rimesso in pausa subito dopo l'avvio con la scheda nascosta, si prova
+  // a farlo ripartire anche in background (backgroundStart) o, in alternativa, al ritorno.
+  // Con la scheda nascosta il controllo dura tutta la fase di avvio: il player (per esempio
+  // JW Player con l'avvio legato alla visibilità) può mettere in pausa anche dopo qualche secondo.
   function watchForEarlyPause(video) {
     const onPause = () => {
       if (video.ended || pausedByHide || seasonBlock) return; // pause volute
       log('Il video è stato rimesso in pausa subito dopo l\'avvio.', tabState());
-      if (document.hidden) resumeWhenVisible(video);
+      if (document.hidden && !backgroundStart(video, 'rimesso in pausa dal player')) resumeWhenVisible(video);
     };
     video.addEventListener('pause', onPause, { once: true });
-    setTimeout(() => video.removeEventListener('pause', onPause), PLAY_CHECK_MS);
+    setTimeout(() => video.removeEventListener('pause', onPause), bgEnabled() ? BG_PHASE_MS : PLAY_CHECK_MS);
+  }
+
+  // ---------- Avvio con la scheda nascosta (browser ridotto a icona o in background) ----------
+  // Il browser consente di avviare un video con audio in una scheda nascosta se la scheda ha
+  // già ricevuto un click (il primo play) e il player ha il permesso di autoplay. Il player del
+  // sito però può non partire o rimettersi in pausa finché la scheda non è visibile: si riprova
+  // poche volte, con attese crescenti, per circa un minuto. Mai all'infinito: poi si avvisa e
+  // l'avvio avviene al ritorno sulla scheda.
+
+  const BG_DELAYS = KWHealth.BACKGROUND_PLAY_DELAYS;
+  const BG_PHASE_MS = 90 * 1000;
+  let bg = null; // { video, attempts, timer, lastError, startedAt, succeeded }
+
+  const bgEnabled = () => settings.enabled && settings.backgroundStart && document.hidden;
+
+  function backgroundStart(video, reason) {
+    if (!bgEnabled()) return false;
+    if (!bg) {
+      bg = { video, attempts: 0, timer: null, lastError: reason, startedAt: Date.now(), succeeded: false };
+      video.addEventListener('pause', bgOnPause);
+      video.addEventListener('playing', bgOnPlaying);
+      const token = bg;
+      setTimeout(() => { if (bg === token) bgStop(); }, BG_PHASE_MS);
+      logEvent({ cat: 'player', fn: 'Avvio in background', msg: 'Scheda nascosta: avvio del nuovo episodio in background', result: `Motivo del primo rifiuto: ${reason}` });
+    }
+    bgSchedule();
+    return true;
+  }
+
+  function bgSchedule() {
+    if (!bg || bg.timer) return;
+    if (bg.attempts >= BG_DELAYS.length || Date.now() - bg.startedAt > BG_PHASE_MS) return bgGiveUp();
+    bg.timer = setTimeout(bgTry, BG_DELAYS[bg.attempts]);
+  }
+
+  async function bgTry() {
+    if (!bg) return;
+    bg.timer = null;
+    const v = bg.video;
+    // Scheda di nuovo visibile: ci pensa il percorso normale (avvio al ritorno).
+    if (!document.hidden) {
+      const target = v;
+      bgStop();
+      if (target.paused && !target.ended) startPlayback(target);
+      return;
+    }
+    if (!v.paused || v.ended || seasonBlock || pausedByHide || !settings.enabled) return;
+    bg.attempts += 1;
+    const err = await tryPlay(v);
+    if (!bg) return;
+    if (err) {
+      bg.lastError = err === 'NotAllowedError' ? 'il browser rifiuta l\'avvio (NotAllowedError)' : err;
+      bgSchedule();
+    }
+  }
+
+  function bgOnPlaying() {
+    if (!bg || bg.succeeded) return;
+    bg.succeeded = true;
+    log(`Nuovo episodio partito con la scheda nascosta${bg.attempts ? ` (tentativo ${bg.attempts})` : ''}.`);
+    logEvent({ cat: 'player', fn: 'Avvio in background', msg: 'Nuovo episodio partito con la scheda nascosta',
+      result: bg.attempts ? `Riuscito al tentativo ${bg.attempts}` : 'Riuscito' });
+  }
+
+  function bgOnPause() {
+    if (!bg) return;
+    const v = bg.video;
+    if (v.ended || pausedByHide || seasonBlock || !document.hidden) return;
+    bg.succeeded = false;
+    bg.lastError = 'rimesso in pausa dal player';
+    bgSchedule();
+  }
+
+  function bgGiveUp() {
+    if (!bg) return;
+    const { video, attempts, lastError } = bg;
+    bgStop();
+    log(`Il nuovo episodio non parte con la scheda nascosta (${lastError}): partirà al ritorno sulla scheda.`);
+    logEvent({ cat: 'player', level: 'warn', fn: 'Avvio in background', msg: 'Il nuovo episodio non parte con la scheda nascosta',
+      action: `${attempts} tentativi in circa un minuto`, result: `${lastError}: partirà quando torni sulla scheda` });
+    if (settings.notifyEnd) {
+      send({ type: 'notify', title: 'Keep Watching: nuovo episodio pronto',
+        message: 'Il browser non lo lascia partire in background: torna sulla scheda e parte da solo.' });
+    }
+    resumeWhenVisible(video);
+  }
+
+  function bgStop() {
+    if (!bg) return;
+    clearTimeout(bg.timer);
+    bg.video.removeEventListener('pause', bgOnPause);
+    bg.video.removeEventListener('playing', bgOnPlaying);
+    bg = null;
   }
 
   function resumeWhenVisible(video) {
@@ -1284,6 +1379,7 @@
 
     log('Avvio non riuscito:', error, tabState());
     if (document.hidden) {
+      if (backgroundStart(video, error)) return;
       logEvent({ cat: 'player', fn: 'Avvio del nuovo episodio', msg: `Avvio rimandato (${error})`, result: 'Riprovo quando torni sulla scheda' });
       resumeWhenVisible(video);
     } else if (error === 'NotAllowedError') {
@@ -1305,7 +1401,12 @@
     }
     if (seasonBlock) return;
     applyResume(video);
-    if (!video.paused) return log('Il nuovo episodio è già in riproduzione.', tabState());
+    if (!video.paused) {
+      log('Il nuovo episodio è già in riproduzione.', tabState());
+      // Con la scheda nascosta si continua a controllare: il player può fermarsi da solo.
+      if (bgEnabled()) watchForEarlyPause(video);
+      return;
+    }
 
     if (document.hidden && settings.pauseOnHidden) {
       pausedByHide = true;

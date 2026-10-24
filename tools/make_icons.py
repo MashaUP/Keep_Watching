@@ -22,12 +22,17 @@ STOPS = [(0.0, (199, 143, 247)), (0.35, (150, 120, 246)), (0.7, (83, 150, 247)),
 ARROW = (142, 152, 248)
 PLAY = (247, 247, 252)
 
-# Varianti: (spessore anello, raggio anello, scala del play, scala della freccia), in frazioni di S.
+# Varianti: spessore e raggio dell'anello, scala del play e della freccia (frazioni di S),
+# centro dell'anello e sfondo.
+#   large   — 48 e 128 px (pagina delle estensioni, menu): quadrato scuro arrotondato.
+#   toolbar — 16 e 32 px (barra del browser): niente quadrato, l'anello occupa tutta
+#             l'icona e un disco scuro dentro l'anello tiene leggibile il play bianco anche
+#             sulle barre chiare. Così l'icona appare grande quanto quelle delle altre estensioni.
 VARIANTS = {
-    "large": (0.115, 0.34, 1.3, 0.95),
-    # Barra del browser (16 e 32 px): simbolo che riempie quasi tutto il quadrato.
-    "small": (0.175, 0.355, 1.5, 0.85),
+    "large": dict(stroke=0.115, radius=0.34, play=1.3, arrow=0.95, cx=0.47, cy=0.535, square=True),
+    "toolbar": dict(stroke=0.19, radius=0.355, play=1.62, arrow=0.72, cx=0.465, cy=0.53, square=False),
 }
+DISK = (24, 25, 40)
 
 
 def lerp(a, b, t):
@@ -55,13 +60,17 @@ def background():
 
 
 def draw(variant):
-    stroke, radius, play_k, arrow_k = VARIANTS[variant]
-    im = background()
+    v = VARIANTS[variant]
+    stroke, radius, play_k, arrow_k = v["stroke"], v["radius"], v["play"], v["arrow"]
+    im = background() if v["square"] else Image.new("RGBA", (S, S), (0, 0, 0, 0))
     ring = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     d = ImageDraw.Draw(ring)
-    cx, cy = S * 0.47, S * 0.535
+    cx, cy = S * v["cx"], S * v["cy"]
     r = S * radius
     w = S * stroke
+    if not v["square"]:
+        inner = r - w / 2 + 2
+        ImageDraw.Draw(im).ellipse([cx - inner, cy - inner, cx + inner, cy + inner], fill=DISK + (255,))
 
     # Anello: da 290° (in alto, appena a destra) scendendo a sinistra, in basso e risalendo a
     # destra fino a -12°. Angoli in coordinate dello schermo (y verso il basso).
@@ -112,7 +121,7 @@ def draw(variant):
 
 def main():
     OUT.mkdir(exist_ok=True)
-    big, small = draw("large"), draw("small")
+    big, small = draw("large"), draw("toolbar")
     for size in (16, 32, 48, 128):
         src = small if size <= 32 else big
         src.resize((size, size), Image.LANCZOS).save(OUT / f"icon{size}.png")

@@ -2,7 +2,7 @@
 
 Estensione per Brave e Chrome che su StreamingCommunity passa da sola all'episodio successivo quando quello corrente finisce, e lo fa partire con l'audio. Salta l'intro e i titoli di coda serie per serie, ha un timer di spegnimento, fa ripartire lo streaming quando si blocca e tiene statistiche di visione solo sul tuo computer. Quando qualcosa non va, il **Centro salute** dice cosa funziona davvero e la **Cronologia** cosa è successo.
 
-Versione 1.5.2
+Versione 1.6.0
 
 Nel browser l'estensione si chiama **Keep Watching**; repository, cartella e zip si chiamano `Keep_Watching`.
 
@@ -35,6 +35,18 @@ Nel browser l'estensione si chiama **Keep Watching**; repository, cartella e zip
 
 Funziona su Brave e Chrome per computer (Edge e altri browser Chromium non sono stati provati; Firefox non è supportato). Non ha telemetria: impostazioni e statistiche restano nello spazio del browser. L'unica richiesta di rete è il controllo degli aggiornamenti verso GitHub, quando premi **Cerca aggiornamento** o, se lo lasci attivo, una volta al giorno all'apertura del menu.
 
+## Collegamenti ufficiali
+
+| Dove | Indirizzo |
+|---|---|
+| Repository GitHub (codice, versioni, novità) | https://github.com/MashaUP/Keep_Watching |
+| Community Discord | https://discord.gg/EPsbQCuAkx |
+| Ko-fi (donazioni) | https://ko-fi.com/mashaup |
+| Documentazione | questo README, su https://github.com/MashaUP/Keep_Watching#readme, più la guida tecnica in [docs/MANUTENZIONE.md](docs/MANUTENZIONE.md) |
+| Segnalare un problema o proporre una funzione | sul server Discord; la pagina delle segnalazioni su GitHub è predisposta ma ancora spenta (vedi [Gestione dei collegamenti](#gestione-dei-collegamenti)) |
+
+Nel menu dell'estensione gli stessi collegamenti sono le piccole icone in basso a sinistra (GitHub, Discord, Ko-fi, Guida) e l'elenco **Community e aiuto** nella sezione **Sostieni**. Le icone sono simboli generici (codice, fumetto, tazza, libro), non i loghi dei servizi.
+
 ## Siti supportati
 
 | Sito | Player | Stato |
@@ -53,7 +65,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 ## 1. Carica il progetto su GitHub
 
 1. Crea un nuovo repository, per esempio `Keep_Watching`. Deve essere **pubblico** perché **Cerca aggiornamento** funzioni: GitHub risponde senza accesso solo per i repository pubblici. Se lo vuoi privato l'estensione funziona lo stesso, ma il controllo degli aggiornamenti dirà "Repository non trovato o privato".
-2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `CHANGELOG.md`, `Keep_Watching-1.5.2.zip` e le cartelle devono stare al primo livello.
+2. Carica **il contenuto** della cartella `Keep_Watching_GitHub` nella radice del repository: `manifest.json`, `version.json`, `links.json`, `CHANGELOG.md`, `Keep_Watching-1.6.0.zip` e le cartelle devono stare al primo livello.
 
 `version.json` e lo zip nella radice sono quello che legge **Cerca aggiornamento**. Se un giorno pubblichi le versioni come **release** di GitHub (con lo zip allegato), l'estensione usa quelle.
 
@@ -61,7 +73,7 @@ L'installazione si fa una volta sola e richiede un paio di minuti.
 
 ### 2.1 Estrai lo zip
 
-1. Scarica `Keep_Watching-1.5.2.zip` (dal repository, oppure dalla cartella del progetto).
+1. Scarica `Keep_Watching-1.6.0.zip` (dal repository, oppure dalla cartella del progetto).
 2. Estrailo con **Estrai qui**: ottieni la cartella `Keep_Watching`, con dentro `manifest.json`.
 3. Mettila in un posto dove resta: il browser carica l'estensione da lì ogni volta. Se la cancelli, l'estensione smette di funzionare.
 
@@ -160,6 +172,7 @@ Si apre cliccando l'icona di Keep_Watching. Le modifiche valgono subito, anche s
 | **Estensione attiva** | Interruttore generale (anche con Alt+Shift+K) | Attivo |
 | **Prossimo episodio automatico** | Passa al successivo a fine episodio | Attivo |
 | **Avvia il nuovo episodio** | Fa partire il nuovo episodio se si carica in pausa | Attivo |
+| **Parti anche con il browser ridotto a icona** | Con la scheda nascosta riprova ad avviare il nuovo episodio per circa un minuto | Attivo |
 | **Conto alla rovescia** | 5, 10, 15 o 20 secondi prima del cambio, oppure cambio immediato | 10 secondi |
 | **Chiedi se continuare dopo** | 1, 2, 3, 5 o 10 episodi di fila | Mai |
 | **Salta l'intro** | Salto automatico nelle serie in cui hai segnato la fine dell'intro | Attivo |
@@ -319,7 +332,9 @@ Per uscire premi **Esc** oppure il pulsante schermo intero del player. La modali
 
 ### Finestra ridotta a icona e altre schede
 
-L'estensione funziona anche con la finestra ridotta a icona o con un'altra scheda in primo piano. Se il browser non lascia partire il nuovo episodio mentre la scheda è nascosta, l'avvio viene ripetuto appena torni sulla scheda.
+L'estensione funziona anche con la finestra ridotta a icona o con un'altra scheda in primo piano: a fine episodio cambia episodio comunque.
+
+Con **Parti anche con il browser ridotto a icona** (attivo di serie, in **Riproduzione › Cambio episodio**), se il nuovo episodio non parte o il player lo rimette in pausa mentre la scheda non è visibile, l'estensione riprova a farlo partire con l'audio: sei tentativi con attese crescenti, in circa un minuto. Se il browser continua a non lasciarlo partire, lo scrive in **Cronologia** con il motivo, manda la notifica "nuovo episodio pronto" e lo fa partire appena torni sulla scheda. Non si aggirano le regole del browser: serve che tu abbia premuto play almeno una volta nella scheda, e un video senza audio con la scheda nascosta può essere messo in pausa dal browser stesso.
 
 Con **Pausa quando cambi scheda** succede il contrario: il video si ferma quando la scheda viene nascosta e riparte quando torni, solo se l'aveva fermato l'estensione.
 
@@ -376,7 +391,7 @@ Se qualcosa non funziona e vuoi segnalarlo:
 1. Riproduci il problema con l'episodio aperto.
 2. Apri il menu in **Centro salute** e premi **Verifica tutto**.
 3. Vai in **Cronologia** e premi **Esporta JSON**.
-4. Allega il file alla segnalazione, insieme alla versione (in alto a sinistra nel menu) e al browser che usi.
+4. Allega il file alla segnalazione (per esempio sul server Discord del progetto), insieme alla versione (in alto a sinistra nel menu) e al browser che usi.
 
 Il file contiene solo gli eventi: niente cookie, token o indirizzi completi. Contiene il nome della serie e dell'episodio se compaiono nei messaggi: controllalo prima di condividerlo.
 
@@ -396,11 +411,45 @@ Il file contiene solo gli eventi: niente cookie, token o indirizzi completi. Con
 - Icone: `python tools/make_icons.py` (serve Pillow).
 - Dettagli su architettura, test, checklist manuale e punti fragili: [docs/MANUTENZIONE.md](docs/MANUTENZIONE.md); compatibilità e piani di ripresa: [docs/COMPATIBILITA.md](docs/COMPATIBILITA.md).
 
+## Gestione dei collegamenti
+
+I collegamenti mostrati nel menu hanno **una sola fonte**: `src/lib/links.js`. Nessun indirizzo è scritto nell'HTML o negli altri file del menu.
+
+| Identificativo | Di serie | Destinazione |
+|---|---|---|
+| `github` | attivo | https://github.com/MashaUP/Keep_Watching |
+| `discord` | attivo | https://discord.gg/EPsbQCuAkx |
+| `kofi` | attivo | https://ko-fi.com/mashaup |
+| `documentation` | attivo | https://github.com/MashaUP/Keep_Watching#readme |
+| `bug-report` | spento | https://github.com/MashaUP/Keep_Watching/issues/new (da accendere dopo aver verificato che le Issues sono attive nel repository) |
+| `feature-request` | spento | come sopra |
+
+Ogni collegamento ha identificativo, indirizzo, etichetta, descrizione (il suggerimento sull'icona), icona, categoria e stato acceso/spento. Un indirizzo viene usato solo se è `https` su uno di questi domini: `github.com`, `discord.gg`, `discord.com`, `ko-fi.com` o un sito `*.github.io`. Un collegamento spento o con un indirizzo non valido non compare.
+
+**Cambiare Discord (o un altro collegamento) senza una nuova versione.** Il menu legge anche `links.json` nella radice del repository GitHub, al massimo una volta ogni 12 ore (e quando premi **Cerca aggiornamento**, non più di una volta al minuto):
+
+1. Su GitHub apri `links.json` e modifica l'indirizzo, per esempio `"discord": { "url": "https://discord.gg/NUOVO", "enabled": true }`.
+2. Salva (commit). Entro 12 ore le estensioni installate useranno il nuovo invito; per vederlo subito premi **Cerca aggiornamento** nel menu.
+
+`links.json` contiene solo dati: `schema` (sempre 1) e `links`, con per ogni identificativo `url`, `enabled`, e facoltativi `label`, `description`, `icon`. Si può anche aggiungere un collegamento nuovo indicando `label` e `url` (l'icona è un link generico, se non è tra quelle del menu). Cache e ripieghi:
+
+- configurazione valida: viene salvata nel browser e usata finché non arriva una nuova;
+- rete assente, tempo scaduto (5 secondi), limite di GitHub o file non valido: si continua con l'ultima configurazione valida salvata, altrimenti con quella di serie;
+- `links.json` assente dal repository: si usano i collegamenti di serie;
+- campi non validi (indirizzo non `https`, dominio fuori elenco, `javascript:`, tipi sbagliati) vengono scartati uno per uno, senza bloccare gli altri.
+
+**Attivare la configurazione remota.** Basta caricare `links.json` nella radice del repository insieme al resto della cartella `Keep_Watching_GitHub`: il repository dev'essere pubblico, come per **Cerca aggiornamento**. Finché il file non è pubblicato il menu usa i collegamenti di serie e lo dice nella sezione **Sostieni** ("Collegamenti di serie di questa versione").
+
+**Aggiungere un collegamento in modo permanente** (o un nuovo dominio): aggiungilo a `DEFAULTS` (e, se serve, il dominio a `ALLOWED_HOSTS`) in `src/lib/links.js`, aggiorna `links.json`, esegui `node tests/run.js` e pubblica una nuova versione. Il menu lo mostra da solo, senza toccare l'HTML.
+
+**Redirect stabile:** non serve. `links.json` sul repository fa già da indirizzo stabile per tutti i collegamenti, senza domini da comprare né servizi in più. Un redirect avrebbe senso solo per far cambiare il link anche fuori dall'estensione (per esempio in un post), e richiederebbe un dominio o un servizio che oggi non c'è.
+
 ## Struttura dei file
 
 ```
-Keep_Watching-1.5.2.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
+Keep_Watching-1.6.0.zip      pacchetto da installare: la cartella Keep_Watching con i soli file dell'estensione
 version.json                 ultima versione pubblicata, letta da "Cerca aggiornamento"
+links.json                   collegamenti aggiornabili senza nuova versione (letti dal menu)
 manifest.json                configurazione dell'estensione (Manifest V3)
 rules.json                   regola di rete: blocca il primo caricamento del player senza permesso di autoplay
 src/background.js            badge, scorciatoie, notifiche, schermo intero, statistiche, cronologia, Verifica tutto, migrazione
@@ -408,6 +457,7 @@ src/defaults.js              opzioni di serie, validazione, profili, categorie d
 src/lib/stats.js             statistiche: misura, sessioni, riepiloghi, CSV e JSON, importazione
 src/lib/updates.js           controllo degli aggiornamenti su GitHub e confronto delle versioni
 src/lib/health.js            stati del player, tentativi, verifiche, cronologia eventi
+src/lib/links.js             collegamenti ufficiali (GitHub, Discord, Ko-fi, guida, segnalazioni) e configurazione remota
 src/player.js                player: cambio episodio, intro e titoli, timer, salto avanti, streaming bloccato, avvio
 src/panel.js                 riquadro e avvisi sul player, tema e aspetto
 src/toolbar.js               barra di pulsanti sul player
@@ -435,11 +485,11 @@ L'estensione non usa librerie esterne. L'unica richiesta di rete propria è il c
 
 ## Donazioni
 
-Keep_Watching è gratis e senza funzioni a pagamento. Se ti è utile, puoi offrire un caffè su Ko-fi: https://ko-fi.com/mashaup (anche dalla sezione **Sostieni** del menu).
+Keep Watching è gratis e senza funzioni a pagamento. Se ti è utile, puoi offrire un caffè su Ko-fi: https://ko-fi.com/mashaup (anche dalla sezione **Sostieni** del menu). Per domande e suggerimenti c'è la community su Discord: https://discord.gg/EPsbQCuAkx.
 
 ## Crediti e licenze
 
 - Codice: licenza MIT (file `LICENSE`).
-- Icona (anello viola-azzurro con freccia e play) disegnata da `tools/make_icons.py` sul modello fornito dall'autore.
+- Icona (anello viola-azzurro con freccia e play) disegnata da `tools/make_icons.py` sul modello fornito dall'autore; a 16 e 32 px è senza quadrato di sfondo, così nella barra del browser appare grande quanto le altre.
 - Icone del menu disegnate a mano in SVG nel file del menu.
 - Progetto personale, non affiliato a StreamingCommunity né a JW Player. L'estensione automatizza i controlli del player senza modificare i contenuti del sito.

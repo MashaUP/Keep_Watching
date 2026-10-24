@@ -73,6 +73,13 @@ module.exports = async () => {
     assert.equal(j.delay(), 1200, 'casualità entro il 20%');
   });
 
+  await test('avvio in background: pochi tentativi crescenti, entro la fase di avvio', () => {
+    const d = H.BACKGROUND_PLAY_DELAYS;
+    assert.ok(d.length >= 3 && d.length <= 8, 'tentativi limitati');
+    assert.ok(d.every((x, i) => i === 0 || x >= d[i - 1]), 'attese crescenti');
+    assert.ok(d.reduce((a, b) => a + b, 0) < 90000, 'tutti dentro i 90 secondi della fase di avvio');
+  });
+
   await test('errori del video classificati per codice', () => {
     assert.equal(H.classifyMediaError(1).recoverable, false);
     assert.equal(H.classifyMediaError(2).kind, 'network');

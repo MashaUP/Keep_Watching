@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "updated": "2026-10-24",
+  "note": "Letto da Keep Watching (menu) al massimo ogni 12 ore. Solo dati: url https su github.com, discord.gg, discord.com, ko-fi.com o *.github.io. Vedi docs/MANUTENZIONE.md, sezione Collegamenti ufficiali.",
+  "links": {
+    "github": { "url": "https://github.com/MashaUP/Keep_Watching", "enabled": true },
+    "discord": { "url": "https://discord.gg/EPsbQCuAkx", "enabled": true },
+    "kofi": { "url": "https://ko-fi.com/mashaup", "enabled": true },
+    "documentation": { "url": "https://github.com/MashaUP/Keep_Watching#readme", "enabled": true },
+    "bug-report": { "url": "https://github.com/MashaUP/Keep_Watching/issues/new", "enabled": false },
+    "feature-request": { "url": "https://github.com/MashaUP/Keep_Watching/issues/new", "enabled": false }
+  }
+}

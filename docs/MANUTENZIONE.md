@@ -25,6 +25,7 @@ Guida tecnica per capire come funziona l'estensione, cosa può rompersi quando i
 19. [Test](#19-test)
 20. [Stato del player, Centro salute e cronologia](#20-stato-del-player-centro-salute-e-cronologia)
 21. [Checklist manuale sul sito reale](#21-checklist-manuale-sul-sito-reale)
+22. [Collegamenti ufficiali](#22-collegamenti-ufficiali)
 
 Audit, matrice dei guasti e piani di ripresa per sito e player: **[COMPATIBILITA.md](COMPATIBILITA.md)**.
 
@@ -330,7 +331,9 @@ Quando la finestra è ridotta a icona o la scheda non è quella attiva, la pagin
 - **Eventi del video.** `ended` e `timeupdate` continuano ad arrivare finché il video suona, quindi il rilevamento della fine episodio funziona anche in background.
 - **Avvio automatico di JW Player.** JW Player può essere configurato per avviarsi solo quando il player è visibile sullo schermo. Con la scheda nascosta, quindi, il nuovo episodio può restare fermo finché non interviene `player.js`.
 
-Cosa fa l'estensione: avvia lei il video se è fermo; se il browser o il player lo bloccano (o lo rimettono in pausa entro 5 secondi), riprova appena la scheda torna visibile.
+Cosa fa l'estensione: avvia lei il video se è fermo. Con la scheda nascosta e **Parti anche con il browser ridotto a icona** attivo (`backgroundStart`, di serie), se `play()` viene rifiutato o il player rimette in pausa il video nei primi 90 secondi, `player.js` riprova con le attese di `KWHealth.BACKGROUND_PLAY_DELAYS` (1,5 / 3 / 6 / 10 / 20 / 30 s: sei tentativi). Ogni tentativo è un semplice `video.play()` con l'audio: niente trucchi sulla visibilità della pagina. Se la scheda torna visibile i tentativi si fermano e l'avvio passa al percorso normale. Esauriti i tentativi: evento in cronologia con l'ultimo motivo, notifica "nuovo episodio pronto" (con le notifiche attive) e avvio al ritorno sulla scheda. Con l'opzione spenta resta il comportamento precedente (avvio al ritorno). Il browser può mettere in pausa da solo un video **senza audio** in una scheda nascosta: per questo il ripiego "senza audio" non aiuta in background.
+
+Non verificabile sul sito di prova: Chromium avviato da Playwright considera sempre visibili le sue schede, anche con la finestra ridotta a icona. Va provato a mano (checklist, sezione 21, voce 21).
 
 **Come diagnosticare.** Ogni messaggio chiave del log riporta `[scheda visibile]` o `[scheda nascosta]`. Per un test: apri DevTools con Ctrl+F8 e il filtro `Keep_Watching`, porta l'episodio agli ultimi secondi, riduci a icona, aspetta il cambio, poi torna sulla finestra e leggi il log. I messaggi restano perché la pagina principale non si ricarica. Il punto in cui la sequenza si interrompe indica il passaggio da indagare:
 
@@ -340,6 +343,8 @@ Cosa fa l'estensione: avvia lei il video se è fermo; se il browser o il player 
 | `passo al successivo [scheda nascosta]`, poi nessun `Player caricato con permesso` | Il sito non ha caricato il nuovo episodio finché la scheda era nascosta |
 | `Il video è stato rimesso in pausa subito dopo l'avvio [scheda nascosta]` | Il player mette in pausa i video non visibili |
 | `Nuovo episodio avviato [scheda nascosta]` senza altri messaggi | Tutto ha funzionato in background |
+| `Nuovo episodio partito con la scheda nascosta (tentativo N)` | Il player si era fermato, ripartito al tentativo N |
+| `Il nuovo episodio non parte con la scheda nascosta (…)` | Sei tentativi falliti: il motivo tra parentesi; partirà al ritorno |
 
 ## 11. Schermo intero tra episodi, notifiche e badge
 
@@ -543,4 +548,14 @@ Da fare su StreamingCommunity con Brave, con il menu aperto su **Centro salute**
 18. Verifica tutto durante la riproduzione: il video non si ferma, non salta, non cambia episodio.
 19. Cronologia: esportazione JSON senza token o indirizzi completi; cancellazione.
 20. Nessun tentativo infinito: con lo streaming fermo a lungo, al massimo un salto e una ricarica, poi l'avviso.
+21. Browser ridotto a icona: con un episodio a pochi secondi dalla fine, riduci a icona e aspetta 2 minuti. In cronologia deve comparire "Nuovo episodio partito con la scheda nascosta" oppure, se il browser non lo consente, "Il nuovo episodio non parte con la scheda nascosta" con il motivo (mandalo per capire cosa lo blocca).
+22. Collegamenti: le icone in basso a sinistra aprono GitHub, Discord, Ko-fi e la guida. Dopo aver caricato `links.json` su GitHub, cambia un indirizzo di prova, premi **Cerca aggiornamento** e controlla che il menu lo usi.
+
+## 22. Collegamenti ufficiali
+
+Fonte unica: `src/lib/links.js` (`KWLinks`), usata solo dal menu. Il menu genera da lì le icone in basso a sinistra (`#navLinks`), l'elenco **Community e aiuto** (`#linkList`), il pulsante e la riga Ko-fi (`[data-kofi-link]`) e il collegamento al repository negli Aggiornamenti (`#repoLink`). `KW_LINKS` in `defaults.js` resta solo per i riferimenti tecnici (repository di "Cerca aggiornamento", pagina delle scorciatoie).
+
+Configurazione remota: `links.json` nella radice del repository, letto con `GET https://api.github.com/repos/MashaUP/Keep_Watching/contents/links.json` (Accept raw, senza credenziali, tempo massimo 5 s). Cache in `chrome.storage.local` → `linksRemote` (`{ at, checkedAt, data, lastError?, okAt? }`), rinnovata al massimo ogni 12 ore all'apertura del menu e, con **Cerca aggiornamento**, al massimo una volta al minuto. Regole di `KWLinks.nextCache`: dati validi → salvati; 404 → cache vuota (valori di serie); errore → si tiene l'ultima valida. Validazione in `KWLinks.parseRemote` e `KWLinks.validUrl` (solo `https`, domini in `ALLOWED_HOSTS` o `*.github.io`, niente credenziali o porte, testi ripuliti, icone solo tra quelle del menu). I testi arrivano nella pagina solo con `textContent`.
+
+Istruzioni per aggiornare, aggiungere o spegnere un collegamento: README, sezione "Gestione dei collegamenti". Test: `tests/unit/links.test.js` (compreso il controllo che `links.json` del repository sia valido e coerente con i valori di serie) e `tests/e2e/test_links.py`.
 

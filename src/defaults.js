@@ -8,7 +8,7 @@
  * Chiavi in chrome.storage.local
  *
  *   Opzioni (popup) — vedi KW_DEFAULTS:
- *     enabled, autoNext, autoPlay, keepFullscreen, notifyEnd, introSkip, pauseOnHidden,
+ *     enabled, autoNext, autoPlay, backgroundStart, keepFullscreen, notifyEnd, introSkip, pauseOnHidden,
  *     watchdog, sleepFade, countdown, skipCredits, stopAfter, quickSkip,
  *     popupsHidden, popups{…}, profile,
  *     uiSize, uiDensity, uiOpacity, uiPosition, uiAutoHide, toolbar{…}, uiReduceMotion,
@@ -38,11 +38,10 @@
 // 3 (1.4.1): uiMinimal sostituita dalla scelta dei singoli pulsanti della barra (toolbar).
 const KW_SETTINGS_SCHEMA = 3;
 
-// Collegamenti ufficiali del progetto: cambiare solo qui.
+// Riferimenti tecnici. I collegamenti mostrati all'utente (GitHub, Discord, Ko-fi, guida,
+// segnalazioni) sono in src/lib/links.js, con la configurazione remota links.json.
 const KW_LINKS = {
-  repo: 'MashaUP/Keep_Watching',
-  repoUrl: 'https://github.com/MashaUP/Keep_Watching',
-  kofi: 'https://ko-fi.com/mashaup',
+  repo: 'MashaUP/Keep_Watching', // repository letto da "Cerca aggiornamento"
   shortcuts: 'chrome://extensions/shortcuts'
 };
 
@@ -82,6 +81,7 @@ const KW_DEFAULTS = {
   enabled: true,
   autoNext: true,
   autoPlay: true,
+  backgroundStart: true,
   keepFullscreen: true,
   notifyEnd: true,
   introSkip: true,
