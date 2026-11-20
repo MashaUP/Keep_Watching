@@ -1,8 +1,9 @@
 'use strict';
+const { test } = require('node:test');
 const assert = require('assert/strict');
 const H = require('../../src/lib/health.js');
 
-module.exports = async () => {
+(async () => {
   await test('stati: avvio, riproduzione, pausa, fine', () => {
     const seen = [];
     const m = H.createMachine('loading', (to, from, ev) => seen.push(`${from}>${to}:${ev}`));
@@ -127,4 +128,4 @@ module.exports = async () => {
     assert.equal(j.schema, 'keep-watching-log');
     assert.equal(j.events[0].at, '1970-01-01T00:00:00.000Z');
   });
-};
+})();

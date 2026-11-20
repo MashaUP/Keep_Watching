@@ -1095,7 +1095,7 @@
     const on = links.filter((l) => l.enabled);
 
     // Barra di icone in basso a sinistra: piccole, con nome e descrizione come suggerimento.
-    $('navLinks').replaceChildren(...on.map((l) => extLink(l, { title: `${l.label}: ${l.description}`, 'aria-label': `${l.label} (si apre in una nuova scheda)` }, svgIcon(l.icon))));
+    $('navLinks').replaceChildren(...on.filter((l) => KWLinks.NAV_IDS.includes(l.id)).map((l) => extLink(l, { title: `${l.label}: ${l.description}`, 'aria-label': `${l.label} (si apre in una nuova scheda)` }, svgIcon(l.icon))));
 
     // Sezione Sostieni: elenco con descrizione (Ko-fi ha già il suo pulsante sopra).
     $('linkList').replaceChildren(...on.filter((l) => l.id !== 'kofi').map((l) => h('li', {},

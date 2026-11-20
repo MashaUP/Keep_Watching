@@ -1,8 +1,9 @@
 'use strict';
+const { test } = require('node:test');
 const assert = require('assert/strict');
 const K = require('../../src/hosts.js');
 
-module.exports = async () => {
+(async () => {
   await test('host del player: vixcloud.co e vixcloud.cc, con sottodomini, porte e indirizzi senza protocollo', () => {
     for (const u of ['https://vixcloud.co/embed/1?token=a', 'https://vixcloud.cc/embed/784302', 'http://vixcloud.cc:8000/embed/1',
       '//vixcloud.cc/embed/2', 'https://www.vixcloud.cc/embed/3']) assert.equal(K.kwIsPlayerUrl(u, 'https://streamingunity.fun/it/iframe/1'), true, u);
@@ -20,4 +21,4 @@ module.exports = async () => {
     assert.equal(K.kwLooksLikeOtherPlayer('https://youtube.com/embed/1', 'https://x.it/'), false);
     assert.equal(K.kwHostOf('/it/iframe/1', 'https://streamingunity.fun/it/watch/1'), 'streamingunity.fun');
   });
-};
+})();

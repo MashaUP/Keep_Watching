@@ -1,6 +1,6 @@
 """
 Menu dell'estensione: impostazioni, popup per categoria, aspetto, profili, statistiche
-(grafico, esportazione, importazione, azzeramento), centro aggiornamenti con GitHub finto,
+(grafico, esportazione, importazione, azzeramento), centro aggiornamenti con version.json finto (raw.githubusercontent.com),
 novità, verifica dell'installazione, Ko-fi.
 
 Avvio: python3 server.py &  poi  xvfb-run -a python3 test_popup.py
@@ -14,12 +14,24 @@ CUR = json.load(open(os.path.join(os.path.dirname(__file__), '..', '..', 'manife
 OLD = '1.3.0'
 
 
-def rel(tag, body='### Aggiunto\n- Nuova funzione\n### Corretto\n- Un bug', pre=False, asset=True):
-    v = tag.lstrip('v')
-    return {'tag_name': tag, 'name': tag, 'prerelease': pre, 'draft': False, 'published_at': '2026-10-20T10:00:00Z', 'body': body,
-            'html_url': f'https://github.com/{REPO}/releases/tag/{tag}',
-            'assets': [{'name': f'Keep_Watching-{v}.zip', 'size': 40000,
-                        'browser_download_url': f'https://github.com/{REPO}/releases/download/{tag}/Keep_Watching-{v}.zip'}] if asset else []}
+CHANGELOG = open(os.path.join(os.path.dirname(__file__), '..', '..', 'CHANGELOG.md'), encoding='utf-8').read()
+SHA = 'b' * 64
+
+
+def vj(version, notes=None, zip=True):
+    """version.json come lo scrive npm run package."""
+    d = {'version': version, 'date': '2026-11-20', 'sha256': SHA, 'notes': ['Nuova funzione', 'Un bug corretto'] if notes is None else notes}
+    if zip:
+        d['zip'] = f'Keep_Watching-{version}.zip'
+    return d
+
+
+def raw(version_json, changelog=CHANGELOG):
+    """Risposte finte di raw.githubusercontent.com (version.json e CHANGELOG.md su main)."""
+    routes = {f'{REPO}/main/version.json': (200, version_json)}
+    if changelog is not None:
+        routes[f'{REPO}/main/CHANGELOG.md'] = (200, changelog)
+    return routes
 
 
 def seeded_stats():
@@ -56,7 +68,7 @@ async def fresh_check(k, pg, routes):
 
 async def main():
     async with KW(quiet=True) as k:
-        k.github = {'/releases?per_page=15': (200, [rel('v' + CUR)])}
+        k.github = raw(vj(CUR))
         await k.set({'stats': seeded_stats(), 'whatsNew': {'version': CUR, 'from': OLD, 'at': int(time.time() * 1000)}})
         pg = await k.popup()
 
@@ -250,55 +262,53 @@ async def main():
         check((await k.get('quickSkip'))['quickSkip'] == 30, 'azzerare le statistiche non tocca le impostazioni')
 
         print('Aggiornamenti (GitHub finto)')
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v' + CUR), rel('v' + OLD)])})
+        st = await fresh_check(k, pg, raw(vj(CUR)))
         check('Sei aggiornato' in st and await pg.is_disabled('#updateAction') and await text(pg, '#uLatest') == CUR, 'stessa versione: "Sei aggiornato"')
-        check(len(await pg.eval_on_selector_all('#historyList .history-item', 'l => l')) == 2, 'registro delle versioni dalle release')
+        check(len(await pg.eval_on_selector_all('#historyList .history-item', 'l => l')) >= 2, 'registro delle versioni dal CHANGELOG del repository')
+        check(k.github_calls and all('raw.githubusercontent.com/' in c for c in k.github_calls), f'solo raw.githubusercontent.com, mai l\'API ({k.github_calls[:3]})')
+        check('version.json' in await text(pg, '#uSource'), 'fonte dichiarata: version.json')
 
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v9.1.0-beta.1', pre=True), rel('v9.0.0'), rel('v' + CUR)])})
+        st = await fresh_check(k, pg, raw(vj('9.0.0')))
         check('9.0.0' in st and await text(pg, '#updateAction') == 'Scarica aggiornamento', 'versione più recente: "Scarica aggiornamento"')
-        check(await visible(pg, '#uPrerelease') and '9.1.0-beta.1' in await text(pg, '#uPrerelease'), 'versione di prova segnalata ma non proposta')
+        check('Nuova funzione' in await text(pg, '#uNotes'), 'novità prese da version.json')
         check(await visible(pg, '#navUpdateDot') is False, 'aperta la sezione: indicatore sul menu spento')
+        await k.ctx.route('https://github.com/**', lambda r: r.fulfill(status=200, body='zip finto', headers={'content-type': 'text/plain'}))
         async with k.ctx.expect_page() as newp:
             await pg.click('#updateAction')
         p2 = await newp.value
         await asyncio.sleep(0.3)
-        check('releases/download/v9.0.0/Keep_Watching-9.0.0.zip' in p2.url, f'download dallo zip della release ufficiale')
+        check(p2.url == f'https://github.com/{REPO}/raw/HEAD/Keep_Watching-9.0.0.zip', f'download dello zip nella radice del repository ({p2.url})')
         await p2.close()
-        page_text = await text(pg, 'section[data-section="updates"]')
         check('installat' not in (await text(pg, '#uStatus')).lower() and not await visible(pg, '#installBanner') and (await k.get('reloadRequest')).get('reloadRequest') is None,
               'dopo il download non dice "installato"')
         check(await visible(pg, '#installSteps'), 'istruzioni per installare lo zip')
 
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v9.0.0', body='', asset=False)])})
-        check(await text(pg, '#updateAction') == 'Apri la pagina su GitHub' and 'non ha note' in await text(pg, '#uNotes'), 'release senza zip né note: pagina della release')
+        st = await fresh_check(k, pg, raw(vj('9.0.0', notes=[], zip=False), changelog=None))
+        check(await text(pg, '#updateAction') == 'Apri la pagina su GitHub' and 'non ha note' in await text(pg, '#uNotes'), 'version.json senza zip né note: pagina del repository')
+        check('non è disponibile' in await text(pg, '#historyEmpty'), 'CHANGELOG assente: registro dichiarato non disponibile')
 
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [rel('v' + OLD)])})
+        st = await fresh_check(k, pg, raw(vj(OLD)))
         check('più recente' in st, f'versione installata più nuova di quella pubblicata: {st}')
 
-        changelog = open(os.path.join(os.path.dirname(__file__), '..', '..', 'CHANGELOG.md'), encoding='utf-8').read().replace(f'## [{CUR}]', f'## [9.9.1] - 2026-10-30\n\n### Corretto\n- Prova\n\n## [{CUR}]')
-        st = await fresh_check(k, pg, {
-            '/releases?per_page=15': (200, []),
-            'contents/version.json': (200, {'version': '9.9.1', 'date': '2026-10-30', 'zip': 'Keep_Watching-9.9.1.zip'}),
-            'contents/CHANGELOG.md': (200, changelog),
-            'contents/': (200, [{'type': 'file', 'name': 'Keep_Watching-9.9.1.zip', 'size': 1, 'download_url': f'https://raw.githubusercontent.com/{REPO}/main/Keep_Watching-9.9.1.zip'}])})
-        check('9.9.1' in st and await text(pg, '#updateAction') == 'Scarica aggiornamento' and 'version.json' in await text(pg, '#uSource'), 'senza release: version.json e zip nel repository')
-        check('Prova' in await text(pg, '#uNotes'), 'note prese dal CHANGELOG del repository')
+        changelog = CHANGELOG.replace(f'## [{CUR}]', f'## [9.9.1] - 2026-10-30\n\n### Corretto\n- Prova\n\n## [{CUR}]')
+        st = await fresh_check(k, pg, raw(vj('9.9.1', notes=[]), changelog))
+        check('9.9.1' in st and await text(pg, '#updateAction') == 'Scarica aggiornamento', 'version.json con zip nel repository')
+        check('Prova' in await text(pg, '#uNotes'), 'version.json senza novità: note prese dal CHANGELOG del repository')
 
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (200, [])})
-        check('né release né version.json' in st, 'nessuna versione pubblicata: messaggio chiaro')
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (404, {'message': 'Not Found'})})
-        check('non trovato o privato' in st, 'repository privato o inesistente')
-        st = await fresh_check(k, pg, {'/releases?per_page=15': 'abort'})
+        st = await fresh_check(k, pg, {})
+        check('non trovato' in st and 'privato' in st, f'version.json assente (404): repository privato o file mancante ({st})')
+        st = await fresh_check(k, pg, {f'{REPO}/main/version.json': (200, '{rotto')})
+        check('JSON valido' in st, f'version.json non valido ({st})')
+        st = await fresh_check(k, pg, {f'{REPO}/main/version.json': 'abort'})
         check('non è raggiungibile' in st, 'rete assente')
-        reset = int(time.time()) + 1800
-        st = await fresh_check(k, pg, {'/releases?per_page=15': (403, {'message': 'API rate limit exceeded'}, {'x-ratelimit-remaining': '0', 'x-ratelimit-reset': str(reset)})})
-        check('limite di richieste' in st, 'limite di richieste di GitHub')
+        st = await fresh_check(k, pg, {f'{REPO}/main/version.json': (429, 'Too Many Requests', {'retry-after': '1800'})})
+        check('limitando' in st, f'limite di GitHub ({st})')
         calls = len(k.github_calls)
         await pg.click('#checkUpdate')
         await asyncio.sleep(0.3)
-        check(len(k.github_calls) == calls and 'di nuovo richieste dalle' in await text(pg, '#uStatus'), 'durante il blocco nessuna nuova richiesta, con l\'orario')
+        check(len([c for c in k.github_calls[calls:] if 'version.json' in c]) == 0 and 'di nuovo richieste dalle' in await text(pg, '#uStatus'), 'durante il blocco nessuna nuova richiesta, con l\'orario')
 
-        k.github = {'/releases?per_page=15': (200, [rel('v' + CUR)])}
+        k.github = raw(vj(CUR))
         await k.set({'updateCheck': {**(await k.get('updateCheck'))['updateCheck'], 'rateLimitReset': None, 'at': int(time.time() * 1000) - 120000}})
         await asyncio.sleep(0.2)
         await pg.click('#checkUpdate')

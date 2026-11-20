@@ -5,7 +5,7 @@
  * solo il service worker, una modifica alla volta. Il player manda pezzi di tempo già
  * misurato ed eventi; questo modulo li somma.
  *
- * Definizioni (vedi anche docs/MANUTENZIONE.md, sezione Statistiche):
+ * Definizioni (vedi anche docs/ARCHITECTURE.md, sezione Statistiche):
  *   - Tempo di visione: secondi in cui il video avanzava davvero (non in pausa, non in
  *     caricamento, non durante un salto), misurati dal player con l'orologio monotono.
  *   - Sessione: inizia alla prima riproduzione reale e continua finché passano meno di
@@ -286,7 +286,7 @@
    */
   function parseImport(text) {
     let data;
-    try { data = typeof text === 'string' ? JSON.parse(text.replace(/^﻿/, '')) : text; }
+    try { data = typeof text === 'string' ? JSON.parse(text.replace(/^\uFEFF/, '')) : text; }
     catch (e) { return { ok: false, error: 'Il file non è un JSON valido.' }; }
     if (!data || typeof data !== 'object') return { ok: false, error: 'Il file è vuoto.' };
     if (data.schema !== EXPORT_SCHEMA) return { ok: false, error: 'Non è un file di statistiche di Keep Watching.' };

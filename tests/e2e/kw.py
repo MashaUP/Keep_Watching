@@ -62,8 +62,10 @@ class KW:
             await asyncio.sleep(0.1)
         await self.sw.evaluate("""(() => { const orig = chrome.notifications.create; self.__notes = [];
             chrome.notifications.create = (o) => { self.__notes.push(o.title + ' | ' + o.message); return orig(o); }; })()""")
-        # GitHub finto: il sandbox non raggiunge api.github.com e i test devono essere ripetibili.
+        # GitHub finto: il sandbox non raggiunge GitHub e i test devono essere ripetibili.
+        # raw.githubusercontent.com è la sola fonte; l'API resta intercettata per accorgersi se viene usata.
         self.github = {}
+        await self.ctx.route('https://raw.githubusercontent.com/**', self._github)
         await self.ctx.route('https://api.github.com/**', self._github)
         self.page = await self.ctx.new_page()
         self.t0 = time.time()
@@ -75,9 +77,8 @@ class KW:
     async def _github(self, route):
         url = route.request.url
         self.github_calls = getattr(self, 'github_calls', []) + [url]
-        # Intestazioni CORS come quelle vere di api.github.com (i limiti di richieste sono leggibili).
-        cors = {'access-control-allow-origin': '*',
-                'access-control-expose-headers': 'ETag, Link, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-RateLimit-Used'}
+        # Intestazioni CORS come quelle vere di raw.githubusercontent.com.
+        cors = {'access-control-allow-origin': '*', 'access-control-expose-headers': 'Retry-After'}
         for pattern, resp in self.github.items():
             if pattern in url:
                 if resp == 'abort':
@@ -85,7 +86,7 @@ class KW:
                 status, body, headers = resp if len(resp) == 3 else (*resp, {})
                 return await route.fulfill(status=status, body=body if isinstance(body, str) else json.dumps(body),
                                            headers={'content-type': 'application/json', **cors, **headers})
-        await route.fulfill(status=404, body='{"message":"Not Found"}', headers={'content-type': 'application/json', **cors})
+        await route.fulfill(status=404, body='404: Not Found', headers={'content-type': 'text/plain; charset=utf-8', **cors})
 
     def _log(self, text):
         line = f'  [{time.time() - self.t0:5.1f}] {text}'

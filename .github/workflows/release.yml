@@ -1,0 +1,123 @@
+# Alla pubblicazione di una release vx.y.z (o a mano): controlla che il tag sia la versione
+# del manifest, ripete i test, crea Keep_Watching-x.y.z.zip e il suo .sha256, li allega alla
+# release (rilanciando si sostituiscono) e annuncia la release su Discord.
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag della release (es. v1.6.1)"
+        required: true
+      salta_test:
+        description: "Allega lo zip anche se i test falliscono"
+        type: boolean
+        default: false
+      annuncia_discord:
+        description: "Annuncia la release anche su Discord"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  zip:
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - name: Codice della release
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Tag uguale alla versione del manifest
+        run: |
+          versione=$(node -p "require('./manifest.json').version")
+          if ! echo "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Il tag $TAG non è nella forma vx.y.z"; exit 1
+          fi
+          if [ "$TAG" != "v$versione" ]; then
+            echo "::error::Il tag $TAG non corrisponde alla versione del manifest ($versione)"; exit 1
+          fi
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Controlli, lint e test di unità
+        if: ${{ !inputs.salta_test }}
+        env:
+          RELEASE_TAG: ${{ env.TAG }}
+          STRICT: "1"
+        run: npm test
+
+      - name: Zip e SHA-256
+        id: zip
+        run: |
+          npm run build
+          nome="Keep_Watching-${TAG#v}.zip"
+          echo "nome=$nome" >> "$GITHUB_OUTPUT"
+          # Lo zip è riproducibile: deve coincidere con quello nella radice (version.json).
+          atteso=$(node -p "require('./version.json').sha256 || ''")
+          ottenuto=$(cut -d' ' -f1 "dist/$nome.sha256")
+          if [ "$atteso" != "$ottenuto" ]; then
+            echo "::warning::Lo SHA-256 dello zip ricreato ($ottenuto) è diverso da quello di version.json ($atteso): controlla che lo zip nella radice sia quello di questa versione."
+          fi
+          echo "SHA-256 $ottenuto" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Allega alla release (sostituisce i file con lo stesso nome)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$TAG" "dist/${{ steps.zip.outputs.nome }}" "dist/${{ steps.zip.outputs.nome }}.sha256" --clobber --repo "$GITHUB_REPOSITORY"
+          echo "Allegati ${{ steps.zip.outputs.nome }} e .sha256 alla release $TAG" >> "$GITHUB_STEP_SUMMARY"
+
+      # Serve il segreto DISCORD_WEBHOOK_URL (Settings › Secrets and variables › Actions), lo stesso
+      # nome degli altri progetti. Alla pubblicazione sempre; rilanciando a mano solo con
+      # «Annuncia la release anche su Discord». Titolo e testo vengono dalla release.
+      - name: Annuncia su Discord
+        if: ${{ github.event_name == 'release' || inputs.annuncia_discord }}
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GH_TOKEN: ${{ github.token }}
+          ZIP: ${{ steps.zip.outputs.nome }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "::warning::Segreto DISCORD_WEBHOOK_URL non impostato: niente annuncio su Discord."
+            exit 0
+          fi
+          case "$DISCORD_WEBHOOK_URL" in
+            https://discord.com/api/webhooks/*|https://discordapp.com/api/webhooks/*|https://ptb.discord.com/api/webhooks/*|https://canary.discord.com/api/webhooks/*) ;;
+            *) echo "::error::DISCORD_WEBHOOK_URL non è l'URL di un webhook di Discord (deve iniziare con https://discord.com/api/webhooks/)."; exit 1 ;;
+          esac
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json name,body,url > release.json
+          jq -n --slurpfile r release.json --arg zip "$ZIP" --arg repo "$GITHUB_REPOSITORY" --arg tag "$TAG" '
+            ($r[0]) as $r |
+            {
+              username: "Keep Watching",
+              allowed_mentions: { parse: [] },
+              embeds: [{
+                title: (($r.name // "") | if . == "" then "Keep Watching \($tag)" else . end)[0:250],
+                url: $r.url,
+                description: ((($r.body // "") | if length > 3500 then .[0:3500] + "…" else . end)
+                  + "\n\n**Scarica:** [\($zip)](https://github.com/\($repo)/releases/download/\($tag)/\($zip))"),
+                color: 9133302
+              }]
+            }' > discord.json
+          codice=$(curl -sS -o risposta.txt -w '%{http_code}' -H 'Content-Type: application/json' --data @discord.json "${DISCORD_WEBHOOK_URL%%\?*}?wait=true")
+          if [ "$codice" != "200" ] && [ "$codice" != "204" ]; then
+            echo "::error::Discord ha risposto $codice: $(head -c 300 risposta.txt)"
+            exit 1
+          fi
+          echo "Annunciata su Discord" >> "$GITHUB_STEP_SUMMARY"

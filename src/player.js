@@ -358,7 +358,7 @@
       machine.send('manual-needed');
       logEvent({ cat: 'next', level: 'error', fn: 'Prossimo episodio', msg: `C'è un episodio successivo ma il pulsante è ${why}`,
         action: 'Cambio automatico', result: 'Non eseguito: il sito potrebbe essere cambiato' });
-      log(`ATTENZIONE: c'è un episodio successivo ma il pulsante è ${why}. Controlla NEXT_SELECTOR (docs/MANUTENZIONE.md).`);
+      log(`ATTENZIONE: c'è un episodio successivo ma il pulsante è ${why}. Controlla NEXT_SELECTOR (docs/SITE_NOTES.md).`);
       send({
         type: 'notify',
         title: 'Keep Watching: pulsante non trovato',
@@ -1446,7 +1446,6 @@
     const v = findVideo();
     const st = machine.state;
     const checks = [];
-    const off = H.DETAIL.off;
 
     // Player e caricamento
     if (v && !['unsupported', 'fatal'].includes(st)) {

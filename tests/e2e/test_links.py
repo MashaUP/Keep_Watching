@@ -1,6 +1,6 @@
 """
 Collegamenti ufficiali nel menu: icone da src/lib/links.js, configurazione remota links.json
-(GitHub finto), validazione, cache e ripiego sui valori di serie. Più l'impostazione
+(raw.githubusercontent.com finto), validazione, cache e ripiego sui valori di serie. Più l'impostazione
 "Parti anche con il browser ridotto a icona".
 
 Avvio: python3 server.py &  poi  xvfb-run -a python3 test_links.py
@@ -8,7 +8,13 @@ Avvio: python3 server.py &  poi  xvfb-run -a python3 test_links.py
 import asyncio, json, time
 from kw import KW, check
 
-LINKS = 'contents/links.json'
+LINKS = 'MashaUP/Keep_Watching/main/links.json'
+NAV = ['github', 'discord', 'kofi', 'documentation']
+LIST = ['github', 'discord', 'documentation', 'changelog', 'bugs', 'ideas']
+
+
+def remote(links, revision=2):
+    return json.dumps({'schemaVersion': 1, 'project': 'keep-watching', 'revision': revision, 'links': links})
 
 
 async def nav_links(pg):
@@ -31,12 +37,12 @@ async def main():
         await asyncio.sleep(0.8)
         nl = await nav_links(pg)
         ids = [x[0] for x in nl]
-        check(ids == ['github', 'discord', 'kofi', 'documentation'], f'icone nella barra: {ids}')
+        check(ids == NAV, f'icone nella barra: solo le quattro principali ({ids})')
         d = dict((x[0], x) for x in nl)
         check(d['github'][1] == 'https://github.com/MashaUP/Keep_Watching' and d['discord'][1] == 'https://discord.gg/EPsbQCuAkx'
               and d['kofi'][1] == 'https://ko-fi.com/mashaup', 'GitHub, Discord e Ko-fi con gli indirizzi ufficiali')
         check(all(x[2] == '_blank' and 'noopener' in x[3] and x[4] and 'nuova scheda' in x[5] for x in nl), 'nuova scheda, senza referrer, con suggerimento ed etichetta accessibile')
-        check(not any(x[0] in ('bug-report', 'feature-request') for x in nl), 'segnalazioni predisposte ma spente: non mostrate')
+        check(not any(x[0] in ('changelog', 'bugs', 'ideas') for x in nl), 'novità, segnalazioni e idee non sono tra le icone piccole')
         box = await (await pg.query_selector('#navLinks a[data-link="discord"]')).bounding_box()
         check(box['width'] <= 28 and box['height'] <= 28, f'icone piccole ({box["width"]}×{box["height"]} px)')
         await pg.focus('#navLinks a[data-link="github"]')
@@ -51,8 +57,15 @@ async def main():
         check(p2.url == 'https://discord.gg/EPsbQCuAkx', f'Discord si apre in una nuova scheda ({p2.url})')
         await p2.close()
         await pg.click('.nav button[data-section="kofi"]')
-        items = await pg.eval_on_selector_all('#linkList a', 'l => l.map(a => a.dataset.link)')
-        check(items == ['github', 'discord', 'documentation'], f'Sostieni: elenco Community e aiuto senza doppione di Ko-fi ({items})')
+        items = await pg.eval_on_selector_all('#linkList a', 'l => l.map(a => [a.dataset.link, a.href])')
+        check([i[0] for i in items] == LIST, f'Sostieni: Community e aiuto con novità, segnalazioni e idee, senza doppione di Ko-fi ({[i[0] for i in items]})')
+        di = dict(items)
+        check(di['bugs'].endswith('/issues/new?template=bug.yml') and di['ideas'].endswith('/issues/new?template=idea.yml')
+              and di['changelog'] == 'https://github.com/MashaUP/Keep_Watching/blob/main/CHANGELOG.md', 'segnalazioni e idee aprono i modelli di GitHub')
+        await pg.screenshot(path='/tmp/kw-sostieni.png')
+        lc = [c for c in k.github_calls if 'links.json' in c]
+        check(lc and all(c == 'https://raw.githubusercontent.com/MashaUP/Keep_Watching/main/links.json' for c in lc), f'links.json letto da raw ({lc[:2]})')
+        check(not any('api.github.com' in c for c in k.github_calls), 'nessuna richiesta all\'API di GitHub')
         check('di serie' in await pg.text_content('#linksSource'), 'fonte dichiarata: collegamenti di serie')
         check(await pg.get_attribute('#repoLink', 'href') == 'https://github.com/MashaUP/Keep_Watching', 'Aggiornamenti: repository dalla stessa fonte')
         cache = (await k.get('linksRemote'))['linksRemote']
@@ -60,13 +73,14 @@ async def main():
         await pg.close()
 
         print('Configurazione remota valida: Discord cambiato senza nuova versione')
-        remote = {'schema': 1, 'links': {'discord': {'url': 'https://discord.gg/NUOVOINVITO'}, 'bug-report': {'enabled': True}}}
-        k.github = {LINKS: (200, json.dumps(remote))}
+        k.github = {LINKS: (200, remote({'discord': {'url': 'https://discord.gg/NUOVOINVITO', 'enabled': True, 'label': 'Discord'}, 'bugs': {'enabled': False}}))}
         await k.set({'linksRemote': None})
         pg = await k.popup()
         d = await links_when(pg, lambda d: d.get('discord') == 'https://discord.gg/NUOVOINVITO')
         check(d.get('discord') == 'https://discord.gg/NUOVOINVITO', f'Discord dalla configurazione remota ({d.get("discord")})')
-        check(d.get('bug-report') == 'https://github.com/MashaUP/Keep_Watching/issues/new', 'segnalazioni accese dalla configurazione remota')
+        await pg.click('.nav button[data-section="kofi"]')
+        items = await pg.eval_on_selector_all('#linkList a', 'l => l.map(a => a.dataset.link)')
+        check('bugs' not in items and 'ideas' in items, f'segnalazioni spente dalla configurazione remota ({items})')
         check('aggiornati dal repository' in await pg.text_content('#linksSource'), 'fonte dichiarata: repository')
         calls = len(k.github_calls)
         await pg.reload()
@@ -85,12 +99,13 @@ async def main():
         check(d.get('discord') == 'https://discord.gg/NUOVOINVITO' and c.get('lastError'), f'rete assente: resta l\'ultima configurazione valida ({c.get("lastError")})')
         await pg.close()
 
-        k.github = {LINKS: (200, '{"schema":1,"links":{"discord":{"url":"javascript:alert(1)"},"github":{"url":"http://github.com/x"}}}')}
+        k.github = {LINKS: (200, remote({'discord': {'url': 'javascript:alert(1)'}, 'github': {'url': 'http://github.com/x'}, 'kofi': {'url': 'https://discord.gg/nonkofi'}}))}
         await k.set({'linksRemote': None})
         pg = await k.popup()
         await asyncio.sleep(1)
         d = dict((x[0], x[1]) for x in await nav_links(pg))
-        check(d['discord'] == 'https://discord.gg/EPsbQCuAkx' and d['github'] == 'https://github.com/MashaUP/Keep_Watching', 'indirizzi non sicuri rifiutati: restano quelli di serie')
+        check(d['discord'] == 'https://discord.gg/EPsbQCuAkx' and d['github'] == 'https://github.com/MashaUP/Keep_Watching' and d['kofi'] == 'https://ko-fi.com/mashaup',
+              'indirizzi non sicuri o sull\'host sbagliato rifiutati: restano quelli di serie')
         hrefs = await pg.eval_on_selector_all('a[href]', 'l => l.map(a => a.getAttribute("href"))')
         check(not any(h.startswith(('javascript:', 'data:', 'http:')) for h in hrefs), 'nessun collegamento pericoloso nella pagina')
         await pg.close()

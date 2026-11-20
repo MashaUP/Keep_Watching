@@ -21,5 +21,6 @@ __pycache__/
 # Test end-to-end: video generati da tests/e2e/make_clips.sh
 tests/e2e/clip-*.webm
 
-# Node.js (i test non hanno dipendenze, ma per sicurezza)
+# Node.js: dipendenze di sviluppo (ESLint) e pacchetti creati da npm run build/package
 node_modules/
+dist/

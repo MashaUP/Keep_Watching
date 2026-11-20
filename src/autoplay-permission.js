@@ -16,7 +16,7 @@
  *      Il nuovo caricamento parte con il permesso già presente.
  *
  * ATTENZIONE: se questo script smette di girare (il sito cambia percorso), la regola
- * di blocco resta attiva e il player non si carica più. Vedi docs/MANUTENZIONE.md.
+ * di blocco resta attiva e il player non si carica più. Vedi docs/SITE_NOTES.md.
  */
 (() => {
   'use strict';

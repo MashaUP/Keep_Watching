@@ -1,0 +1,40 @@
+name: Segnala un problema
+description: Qualcosa non funziona in Keep Watching
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Prima di scrivere: apri il menu dell'estensione, **Centro salute › Verifica tutto**, poi **Cronologia › Esporta JSON**. Il file non contiene cookie, token né indirizzi completi, ma può contenere il nome della serie: controllalo prima di allegarlo.
+  - type: input
+    id: versione
+    attributes:
+      label: Versione di Keep Watching
+      description: In alto a sinistra nel menu dell'estensione.
+      placeholder: "es. 1.6.1"
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser e versione
+      placeholder: "es. Brave 1.73 su Windows 11 / Chrome 131"
+    validations:
+      required: true
+  - type: textarea
+    id: cosa
+    attributes:
+      label: Cosa è successo
+      description: Cosa ti aspettavi, cosa è successo invece e come riprodurlo (un passo per riga).
+    validations:
+      required: true
+  - type: textarea
+    id: verifica
+    attributes:
+      label: Risultato di «Verifica tutto»
+      description: Le voci in errore o «Da verificare», con il loro testo.
+  - type: textarea
+    id: report
+    attributes:
+      label: Cronologia esportata (report diagnostico)
+      description: Allega il file JSON di «Cronologia › Esporta JSON» oppure incollane il contenuto.

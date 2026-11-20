@@ -6,7 +6,7 @@
  * vanno aggiornati, perché il browser li vuole scritti per esteso:
  *   - manifest.json → content_scripts[0].matches (dove gira player.js);
  *   - rules.json → requestDomains delle due regole.
- * Vedi docs/MANUTENZIONE.md, "Il player cambia dominio".
+ * Vedi docs/SITE_NOTES.md, "Se il player cambia dominio".
  */
 const KW_PLAYER_HOSTS = ['vixcloud.co', 'vixcloud.cc'];
 

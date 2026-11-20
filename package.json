@@ -1,0 +1,20 @@
+{
+  "name": "keep-watching",
+  "version": "1.6.1",
+  "private": true,
+  "description": "Keep Watching — prossimo episodio automatico su StreamingCommunity (estensione Manifest V3). Nessuna dipendenza a runtime: npm serve solo per controlli, test e pacchetto.",
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "lint": "eslint .",
+    "test": "node scripts/check.mjs && eslint . && node --test \"tests/unit/*.test.js\"",
+    "test:e2e": "bash tests/e2e/run_all.sh",
+    "build": "node scripts/build.mjs",
+    "package": "node scripts/build.mjs --github"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^17.14.0"
+  }
+}

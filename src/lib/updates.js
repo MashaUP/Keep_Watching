@@ -1,20 +1,19 @@
 /**
  * Keep_Watching — centro aggiornamenti (funzioni pure + un controllo con fetch iniettabile).
  *
- * Fonte ufficiale: il repository GitHub in KW_LINKS.repo (src/defaults.js).
- * Ordine di lettura, tutte richieste anonime all'API pubblica di GitHub:
- *   1. Release GitHub (GET /repos/{repo}/releases): se ce ne sono, si usano quelle.
- *      Le bozze sono ignorate, le prerelease mostrate ma mai proposte come aggiornamento.
- *   2. Altrimenti version.json nella radice del repository (come Vinted_Relist), con
- *      verifica che lo zip indicato esista davvero nel repository, e CHANGELOG.md per
- *      il registro delle versioni.
+ * Fonte ufficiale: il repository GitHub in KW_LINKS.repo (src/defaults.js), letto come file
+ * semplici da raw.githubusercontent.com (claude/standard-comuni.md, sezione 3):
+ *   1. version.json nella radice di main: versione, data, nome dello zip, SHA-256, novità;
+ *   2. CHANGELOG.md di main, facoltativo, per il registro delle versioni.
+ * Niente API di GitHub (limite di 60 richieste l'ora) e niente releases/latest.
  * Nessun dato locale viene inviato: niente cookie (credentials: 'omit'), niente parametri.
  * Il codice scaricato non viene mai eseguito: lo zip si apre in una scheda e lo estrae l'utente.
  */
 (function (root) {
   'use strict';
 
-  const API = 'https://api.github.com';
+  const RAW = 'https://raw.githubusercontent.com';
+  const SHA_RE = /^[0-9a-f]{64}$/;
   const KW_UPDATE_COOLDOWN_MS = 60 * 1000;
   const KW_UPDATE_AUTO_MS = 24 * 60 * 60 * 1000;
   const ZIP_RE = /^Keep_Watching-(\d+\.\d+\.\d+)\.zip$/;
@@ -106,38 +105,9 @@
       version: v.text,
       date: /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || '')) ? d.date : null,
       zip: zipM && zipM[1] === v.text ? d.zip : null,
-      notes: Array.isArray(d.notes) ? d.notes.filter((n) => typeof n === 'string').map((n) => clean(n).slice(0, 240)).slice(0, 12) : []
+      sha256: typeof d.sha256 === 'string' && SHA_RE.test(d.sha256) ? d.sha256 : null,
+      notes: Array.isArray(d.notes) ? d.notes.filter((n) => typeof n === 'string').map((n) => clean(n).slice(0, 300)).filter(Boolean).slice(0, 12) : []
     };
-  }
-
-  // ---------- Release GitHub ----------
-
-  /** Lo zip giusto di una release: Keep_Watching-<versione>.zip, oppure l'unico zip presente. */
-  function pickAsset(release) {
-    const assets = Array.isArray(release && release.assets) ? release.assets : [];
-    const version = (parseVersion(release.tag_name) || {}).text;
-    const exact = assets.find((a) => { const m = ZIP_RE.exec(a.name || ''); return m && m[1] === version; });
-    if (exact) return { name: exact.name, url: exact.browser_download_url, size: exact.size || null };
-    const zips = assets.filter((a) => /\.zip$/i.test(a.name || '') && /keep[_-]?watching/i.test(a.name || ''));
-    if (zips.length === 1) return { name: zips[0].name, url: zips[0].browser_download_url, size: zips[0].size || null };
-    return null;
-  }
-
-  /** Release valide, dalla più recente; le bozze e i tag non semantici sono scartati. */
-  function normalizeReleases(list) {
-    if (!Array.isArray(list)) return [];
-    return list
-      .filter((r) => r && !r.draft && parseVersion(r.tag_name))
-      .map((r) => ({
-        version: parseVersion(r.tag_name).text,
-        prerelease: Boolean(r.prerelease) || parseVersion(r.tag_name).pre.length > 0,
-        date: r.published_at ? String(r.published_at).slice(0, 10) : null,
-        url: typeof r.html_url === 'string' && r.html_url.startsWith('https://github.com/') ? r.html_url : null,
-        notes: bulletsFrom(r.body),
-        hasNotes: Boolean(r.body && String(r.body).trim()),
-        asset: pickAsset(r)
-      }))
-      .sort((a, b) => compareVersions(b.version, a.version));
   }
 
   /** Stato da mostrare confrontando la versione installata con l'ultima stabile. */
@@ -150,17 +120,16 @@
     return 'uptodate';
   }
 
-  /** Risposta HTTP di GitHub → frase comprensibile. */
-  function githubError(status, headers) {
+  /** Risposta HTTP di raw.githubusercontent.com → frase comprensibile. */
+  function githubError(status, headers, now = Date.now()) {
     const get = (h) => (headers && typeof headers.get === 'function' ? headers.get(h) : headers && headers[h]);
     if (!status) return { kind: 'network', text: 'GitHub non è raggiungibile: controlla la connessione.' };
-    if ((status === 403 || status === 429) && (get('x-ratelimit-remaining') === '0' || status === 429)) {
-      const reset = Number(get('x-ratelimit-reset')) * 1000;
-      return { kind: 'ratelimit', reset: Number.isFinite(reset) && reset > 0 ? reset : null,
-        text: 'GitHub ha raggiunto il limite di richieste da questa rete (60 all\'ora senza accesso): riprova più tardi.' };
+    if (status === 403 || status === 429) {
+      const wait = Number(get('retry-after'));
+      return { kind: 'ratelimit', reset: Number.isFinite(wait) && wait > 0 ? now + Math.min(wait, 3600) * 1000 : null,
+        text: 'GitHub sta limitando le richieste da questa rete: riprova tra qualche minuto.' };
     }
-    if (status === 404) return { kind: 'notfound', text: 'Repository non trovato o privato: il controllo funziona solo con un repository pubblico.' };
-    if (status === 403) return { kind: 'forbidden', text: 'GitHub ha rifiutato la richiesta (HTTP 403).' };
+    if (status === 404) return { kind: 'notfound', text: 'version.json non trovato: il repository è privato, ha cambiato nome o il file non è ancora pubblicato.' };
     return { kind: 'http', text: `GitHub ha risposto con un errore (HTTP ${status}).` };
   }
 
@@ -169,76 +138,34 @@
    * Restituisce sempre un oggetto da salvare in updateCheck (mai eccezioni).
    */
   async function checkForUpdates({ repo, installed, fetchImpl, now = Date.now() }) {
-    const base = `${API}/repos/${repo}`;
-    const init = (accept) => ({ headers: { Accept: accept }, cache: 'no-store', credentials: 'omit' });
+    const base = `${RAW}/${repo}/main`;
+    const init = { cache: 'no-store', credentials: 'omit' };
     const result = { at: now, repo, installed, ok: false, source: null, status: 'error', latest: null, prerelease: null, history: [], error: null };
 
-    const get = async (url, accept) => {
+    const get = async (url) => {
       try {
-        const r = await fetchImpl(url, init(accept));
+        const r = await fetchImpl(url, init);
         return { status: r.status, headers: r.headers, ok: r.ok, text: r.ok ? await r.text() : '' };
       } catch (e) {
         return { status: 0, headers: null, ok: false, text: '' };
       }
     };
-    const fail = (resp) => {
-      const e = githubError(resp.status, resp.headers);
+
+    // 1. version.json: senza questo non c'è niente da confrontare.
+    const vj = await get(`${base}/version.json`);
+    if (!vj.ok) {
+      const e = githubError(vj.status, vj.headers, now);
       result.error = e.text;
       result.errorKind = e.kind;
       if (e.reset) result.rateLimitReset = e.reset;
       return result;
-    };
-
-    // 1. Release GitHub
-    // Un repository pubblico risponde sempre 200 (anche con zero release): 404 vuol dire
-    // repository inesistente o privato.
-    const rel = await get(`${base}/releases?per_page=15`, 'application/vnd.github+json');
-    if (!rel.ok) return fail(rel);
-    {
-      let list;
-      try { list = normalizeReleases(JSON.parse(rel.text)); } catch (e) { list = []; }
-      if (list.length) {
-        const stable = list.find((r) => !r.prerelease) || null;
-        const pre = list.find((r) => r.prerelease) || null;
-        result.ok = true;
-        result.source = 'releases';
-        result.latest = stable;
-        result.prerelease = pre && (!stable || compareVersions(pre.version, stable.version) > 0) ? pre : null;
-        result.history = list.slice(0, 10);
-        result.status = stable ? updateStatus(installed, stable) : 'none';
-        return result;
-      }
-    }
-
-    // 2. version.json + elenco dei file + CHANGELOG.md
-    const vj = await get(`${base}/contents/version.json`, 'application/vnd.github.raw+json');
-    if (!vj.ok) {
-      if (vj.status === 404) {
-        result.error = 'Nel repository non ci sono né release né version.json: nessuna versione pubblicata da confrontare.';
-        result.errorKind = 'nothing';
-        return result;
-      }
-      return fail(vj);
     }
     const remote = parseVersionJson(vj.text);
     if (!remote.ok) { result.error = remote.error; result.errorKind = 'invalid'; return result; }
 
-    let asset = null;
-    if (remote.zip) {
-      const listing = await get(`${base}/contents/`, 'application/vnd.github+json');
-      if (listing.ok) {
-        try {
-          const files = JSON.parse(listing.text);
-          const f = Array.isArray(files) && files.find((x) => x && x.type === 'file' && x.name === remote.zip);
-          if (f && typeof f.download_url === 'string' && f.download_url.startsWith('https://')) {
-            asset = { name: f.name, url: f.download_url, size: f.size || null };
-          }
-        } catch (e) { /* elenco illeggibile: niente download diretto */ }
-      }
-    }
-
+    // 2. CHANGELOG.md, facoltativo: se manca resta solo il registro vuoto.
     let history = [];
-    const cl = await get(`${base}/contents/CHANGELOG.md`, 'application/vnd.github.raw+json');
+    const cl = await get(`${base}/CHANGELOG.md`);
     if (cl.ok) {
       history = parseChangelog(cl.text, 10).map((s) => ({
         version: s.version, date: s.date, prerelease: (parseVersion(s.version) || { pre: [] }).pre.length > 0,
@@ -256,7 +183,8 @@
       url: `https://github.com/${repo}`,
       notes: remote.notes.length ? remote.notes : (fromLog ? fromLog.notes : []),
       hasNotes: remote.notes.length > 0 || Boolean(fromLog && fromLog.hasNotes),
-      asset
+      // Lo zip sta nella radice del repository (lo garantisce npm run check prima della release).
+      asset: remote.zip ? { name: remote.zip, url: `https://github.com/${repo}/raw/HEAD/${remote.zip}`, sha256: remote.sha256, size: null } : null
     };
     result.history = history;
     result.status = updateStatus(installed, result.latest);
@@ -278,9 +206,9 @@
   }
 
   const api = {
-    KW_UPDATE_COOLDOWN_MS, KW_UPDATE_AUTO_MS, ZIP_RE,
+    RAW, KW_UPDATE_COOLDOWN_MS, KW_UPDATE_AUTO_MS, ZIP_RE,
     parseVersion, compareVersions, bulletsFrom, parseChangelog, parseVersionJson,
-    pickAsset, normalizeReleases, updateStatus, githubError, checkForUpdates, canCheck, dueForAutoCheck
+    updateStatus, githubError, checkForUpdates, canCheck, dueForAutoCheck
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

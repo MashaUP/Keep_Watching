@@ -1,0 +1,32 @@
+# A ogni push su main e a ogni pull request: controlli del repository, ESLint, test di unità
+# e pacchetto di prova (scaricabile per 14 giorni dalla pagina dell'esecuzione).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Controlli, lint e test di unità
+        run: npm test
+      - name: Pacchetto di prova
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: keep-watching-build-${{ github.sha }}
+          path: dist/*.zip*
+          retention-days: 14

@@ -1,9 +1,10 @@
 'use strict';
+const { test } = require('node:test');
 const assert = require('assert/strict');
 const U = require('../../src/lib/updates.js');
 
 const REPO = 'MashaUP/Keep_Watching';
-const API = `https://api.github.com/repos/${REPO}`;
+const RAW = `https://raw.githubusercontent.com/${REPO}/main`;
 
 /** fetch finto: mappa URL → { status, body, headers } oppure 'rete' per un errore di rete. */
 function fakeFetch(routes, calls = []) {
@@ -20,28 +21,15 @@ function fakeFetch(routes, calls = []) {
   };
 }
 
-const release = (tag, extra = {}) => ({
-  tag_name: tag, draft: false, prerelease: false, published_at: '2026-10-17T10:00:00Z',
-  html_url: `https://github.com/${REPO}/releases/tag/${tag}`,
-  body: '### Aggiunto\n- **Statistiche** locali\n- Centro aggiornamenti',
-  assets: [{ name: `Keep_Watching-${tag.replace(/^v/, '')}.zip`, browser_download_url: `https://github.com/${REPO}/releases/download/${tag}/Keep_Watching-${tag.replace(/^v/, '')}.zip`, size: 40000 }],
-  ...extra
-});
-
 const CHANGELOG = '# Changelog\n\n## [1.4.0] - 2026-10-17\n\n### Aggiunto\n- Statistiche\n\n### Corretto\n- Il pulsante **+60 s** non sparisce più\n\n## [1.3.0] - 2026-10-09\n\n### Aggiunto\n- Salto intro\n';
-const VERSION_JSON = { version: '1.4.0', date: '2026-10-17', zip: 'Keep_Watching-1.4.0.zip', notes: ['Statistiche locali', 'Centro aggiornamenti'] };
-const LISTING = [
-  { type: 'file', name: 'Keep_Watching-1.4.0.zip', download_url: `https://raw.githubusercontent.com/${REPO}/main/Keep_Watching-1.4.0.zip`, size: 41000 },
-  { type: 'file', name: 'version.json', download_url: 'https://raw.githubusercontent.com/x/version.json' }
-];
-const versionJsonRoutes = (vj = VERSION_JSON, listing = LISTING) => ({
-  [`${API}/releases?per_page=15`]: { status: 200, body: [] },
-  [`${API}/contents/version.json`]: { status: 200, body: vj },
-  [`${API}/contents/`]: { status: 200, body: listing },
-  [`${API}/contents/CHANGELOG.md`]: { status: 200, body: CHANGELOG }
+const SHA = 'a'.repeat(64);
+const VERSION_JSON = { version: '1.4.0', date: '2026-10-17', zip: 'Keep_Watching-1.4.0.zip', sha256: SHA, notes: ['Statistiche locali', 'Centro aggiornamenti'] };
+const routes = (vj = VERSION_JSON, cl = { status: 200, body: CHANGELOG }) => ({
+  [`${RAW}/version.json`]: { status: 200, body: vj },
+  [`${RAW}/CHANGELOG.md`]: cl
 });
 
-module.exports = async () => {
+(async () => {
   await test('versioni: confronto semantico, prefisso v, prerelease', () => {
     assert.equal(U.compareVersions('1.10.0', '1.9.0'), 1);
     assert.equal(U.compareVersions('v1.4.0', '1.4.0'), 0);
@@ -62,68 +50,56 @@ module.exports = async () => {
     assert.deepEqual(cl[0].items[1], { section: 'Corretto', text: 'Il pulsante +60 s non sparisce più' });
   });
 
-  await test('release: versione uguale → aggiornata', async () => {
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${API}/releases?per_page=15`]: { status: 200, body: [release('v1.4.0')] } }) });
-    assert.equal(r.source, 'releases');
+  await test('version.json: versione uguale → aggiornata', async () => {
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch(routes()) });
+    assert.equal(r.source, 'version-json');
     assert.equal(r.status, 'uptodate');
   });
 
-  await test('release: versione più recente con lo zip giusto', async () => {
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${API}/releases?per_page=15`]: { status: 200, body: [release('v1.5.0'), release('v1.4.0')] } }) });
+  await test('version.json: versione più recente, zip da github.com/raw/HEAD con SHA-256', async () => {
+    const calls = [];
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.3.0', fetchImpl: fakeFetch(routes(), calls) });
     assert.equal(r.status, 'available');
-    assert.equal(r.latest.version, '1.5.0');
-    assert.equal(r.latest.asset.name, 'Keep_Watching-1.5.0.zip');
+    assert.equal(r.latest.version, '1.4.0');
+    assert.equal(r.latest.asset.url, `https://github.com/${REPO}/raw/HEAD/Keep_Watching-1.4.0.zip`);
+    assert.equal(r.latest.asset.sha256, SHA);
     assert.deepEqual(r.latest.notes, ['Statistiche locali', 'Centro aggiornamenti']);
+    assert.equal(r.history[0].version, '1.4.0');
     assert.equal(r.history.length, 2);
+    assert.deepEqual(calls.map((c) => c.url), [`${RAW}/version.json`, `${RAW}/CHANGELOG.md`], 'solo raw.githubusercontent.com, niente API');
+    assert.ok(calls.every((c) => c.init.credentials === 'omit' && c.init.cache === 'no-store'), 'nessun cookie, nessuna cache');
+    assert.ok(calls.every((c) => !c.url.includes('?')), 'nessun dato locale nelle richieste');
   });
 
-  await test('release: versione pubblicata più vecchia di quella installata', async () => {
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${API}/releases?per_page=15`]: { status: 200, body: [release('v1.3.0')] } }) });
+  await test('version.json: versione pubblicata più vecchia di quella installata', async () => {
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.5.0', fetchImpl: fakeFetch(routes()) });
     assert.equal(r.status, 'ahead');
   });
 
-  await test('release: la prerelease non viene proposta come aggiornamento, le bozze ignorate', async () => {
-    const list = [release('v1.5.0-beta.1', { prerelease: true }), release('v9.0.0', { draft: true }), release('v1.4.0')];
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${API}/releases?per_page=15`]: { status: 200, body: list } }) });
-    assert.equal(r.status, 'uptodate');
-    assert.equal(r.prerelease.version, '1.5.0-beta.1');
-    assert.equal(r.history.some((h) => h.version === '9.0.0'), false);
+  await test('version.json senza note: si usano quelle del CHANGELOG', async () => {
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.3.0', fetchImpl: fakeFetch(routes({ ...VERSION_JSON, notes: [] })) });
+    assert.deepEqual(r.latest.notes, ['Aggiunto: Statistiche', 'Corretto: Il pulsante +60 s non sparisce più']);
   });
 
-  await test('release senza asset e senza note: niente download diretto, note segnalate assenti', async () => {
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${API}/releases?per_page=15`]: { status: 200, body: [release('v1.5.0', { assets: [], body: '' })] } }) });
+  await test('CHANGELOG assente: il controllo riesce lo stesso, registro vuoto', async () => {
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.3.0', fetchImpl: fakeFetch(routes(VERSION_JSON, { status: 404, body: '' })) });
+    assert.equal(r.ok, true);
+    assert.equal(r.status, 'available');
+    assert.deepEqual(r.history, []);
+  });
+
+  await test('version.json senza zip valido: nessun download inventato', async () => {
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.3.0', fetchImpl: fakeFetch(routes({ ...VERSION_JSON, zip: 'altro.zip' })) });
     assert.equal(r.status, 'available');
     assert.equal(r.latest.asset, null);
-    assert.equal(r.latest.hasNotes, false);
-    assert.match(r.latest.url, /releases\/tag\/v1.5.0$/);
   });
 
-  await test('release con più zip: si sceglie quello della versione, altrimenti nessuno', () => {
-    const rel = release('v1.5.0', { assets: [
-      { name: 'Keep_Watching_GitHub.zip', browser_download_url: 'https://x/a.zip' },
-      { name: 'Keep_Watching-1.5.0.zip', browser_download_url: 'https://x/b.zip' }] });
-    assert.equal(U.pickAsset(rel).url, 'https://x/b.zip');
-    const amb = release('v1.5.0', { assets: [
-      { name: 'Keep_Watching_GitHub.zip', browser_download_url: 'https://x/a.zip' },
-      { name: 'Keep_Watching-old.zip', browser_download_url: 'https://x/c.zip' }] });
-    assert.equal(U.pickAsset(amb), null);
-  });
-
-  await test('nessuna release: si usa version.json, con zip verificato nel repository', async () => {
-    const calls = [];
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.3.0', fetchImpl: fakeFetch(versionJsonRoutes(), calls) });
-    assert.equal(r.source, 'version-json');
-    assert.equal(r.status, 'available');
-    assert.equal(r.latest.asset.url, `https://raw.githubusercontent.com/${REPO}/main/Keep_Watching-1.4.0.zip`);
-    assert.equal(r.history[0].version, '1.4.0');
-    assert.ok(calls.every((c) => c.init.credentials === 'omit'), 'nessun cookie inviato');
-    assert.ok(calls.every((c) => !c.url.includes('?') || c.url.endsWith('per_page=15')), 'nessun dato locale nelle richieste');
-  });
-
-  await test('version.json che indica uno zip assente: nessun download inventato', async () => {
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.3.0', fetchImpl: fakeFetch(versionJsonRoutes(VERSION_JSON, [LISTING[1]])) });
-    assert.equal(r.status, 'available');
-    assert.equal(r.latest.asset, null);
+  await test('version.json: SHA-256 e note validati', () => {
+    assert.equal(U.parseVersionJson({ ...VERSION_JSON, sha256: 'xyz' }).sha256, null);
+    assert.equal(U.parseVersionJson({ ...VERSION_JSON, sha256: SHA.toUpperCase() }).sha256, null);
+    const long = U.parseVersionJson({ ...VERSION_JSON, notes: ['x'.repeat(400), 5, '', ...Array(20).fill('ok')] });
+    assert.equal(long.notes[0].length, 300);
+    assert.equal(long.notes.length, 12);
   });
 
   await test('version.json con zip di un\'altra versione o malformato', async () => {
@@ -133,32 +109,39 @@ module.exports = async () => {
     assert.equal(U.parseVersionJson({ version: 'nuova' }).ok, false);
   });
 
-  await test('niente release né version.json: messaggio chiaro, nessun aggiornamento', async () => {
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({
-      [`${API}/releases?per_page=15`]: { status: 200, body: [] },
-      [`${API}/contents/version.json`]: { status: 404, body: {} } }) });
+  await test('version.json assente (404): repository privato o file non pubblicato', async () => {
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${RAW}/version.json`]: { status: 404, body: '404: Not Found' } }) });
     assert.equal(r.ok, false);
-    assert.equal(r.errorKind, 'nothing');
+    assert.equal(r.errorKind, 'notfound');
+    assert.match(r.error, /privato/);
   });
 
   await test('errore di rete', async () => {
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${API}/releases?per_page=15`]: 'rete' }) });
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${RAW}/version.json`]: 'rete' }) });
     assert.equal(r.ok, false);
     assert.equal(r.errorKind, 'network');
   });
 
-  await test('limite di richieste di GitHub: errore e blocco fino al reset', async () => {
-    const reset = Math.floor(Date.now() / 1000) + 600;
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${API}/releases?per_page=15`]: { status: 403, body: {}, headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': String(reset) } } }) });
+  await test('limite di GitHub (429 con Retry-After): errore e blocco fino alla scadenza', async () => {
+    const now = Date.now();
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', now, fetchImpl: fakeFetch({ [`${RAW}/version.json`]: { status: 429, body: '', headers: { 'retry-after': '600' } } }) });
     assert.equal(r.errorKind, 'ratelimit');
-    assert.equal(r.rateLimitReset, reset * 1000);
-    assert.equal(U.canCheck(r, Date.now() + 120000), false);
-    assert.equal(U.canCheck(r, reset * 1000 + 1), true);
+    assert.equal(r.rateLimitReset, now + 600000);
+    assert.equal(U.canCheck(r, now + 120000), false);
+    assert.equal(U.canCheck(r, now + 600001), true);
   });
 
-  await test('repository privato o inesistente', async () => {
-    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${API}/releases?per_page=15`]: { status: 404, body: {} } }) });
-    assert.equal(r.errorKind, 'notfound');
+  await test('403 senza Retry-After: limite, ma si può riprovare dopo un minuto', async () => {
+    const now = Date.now();
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', now, fetchImpl: fakeFetch({ [`${RAW}/version.json`]: { status: 403, body: '' } }) });
+    assert.equal(r.errorKind, 'ratelimit');
+    assert.equal(r.rateLimitReset, undefined);
+    assert.equal(U.canCheck(r, now + 61000), true);
+  });
+
+  await test('version.json non valido', async () => {
+    const r = await U.checkForUpdates({ repo: REPO, installed: '1.4.0', fetchImpl: fakeFetch({ [`${RAW}/version.json`]: { status: 200, body: '{rotto' } }) });
+    assert.equal(r.errorKind, 'invalid');
   });
 
   await test('controlli ravvicinati e controllo automatico giornaliero', () => {
@@ -169,4 +152,4 @@ module.exports = async () => {
     assert.equal(U.dueForAutoCheck({ at: now - 3600000 }, now), false);
     assert.equal(U.dueForAutoCheck({ at: now - 25 * 3600000 }, now), true);
   });
-};
+})();

@@ -1,5 +1,12 @@
 {
-  "version": "1.6.0",
-  "date": "2026-10-24",
-  "zip": "Keep_Watching-1.6.0.zip"
+  "version": "1.6.1",
+  "date": "2026-11-20",
+  "zip": "Keep_Watching-1.6.1.zip",
+  "sha256": "d553050a9e3acd400b9ba37e795a5c95af6824241f01665bc43fd73b3b116c14",
+  "notes": [
+    "Cerca aggiornamento legge version.json e CHANGELOG.md da raw.githubusercontent.com invece che dall'API di GitHub (limite di 60 richieste l'ora). Lo zip si scarica dalla radice del repository; le release non vengono più lette.",
+    "links.json nel formato comune e letto da raw.githubusercontent.com. Host controllati per collegamento: GitHub solo su github.com, Discord su discord.gg o discord.com, Ko-fi su ko-fi.com, documentazione su mashaup.github.io.",
+    "Nuovi collegamenti Novità, Segnala un problema e Proponi un'idea (modelli su GitHub) in Sostieni › Community e aiuto. Le icone in basso a sinistra restano GitHub, Discord, Ko-fi e Guida.",
+    "version.json contiene anche lo SHA-256 dello zip e le novità della versione."
+  ]
 }

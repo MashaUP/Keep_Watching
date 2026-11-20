@@ -3,6 +3,24 @@
 Tutte le modifiche rilevanti del progetto sono elencate qui.
 Il formato segue [Keep a Changelog](https://keepachangelog.com/it-IT/1.1.0/) e le versioni seguono il [Semantic Versioning](https://semver.org/lang/it/).
 
+## [1.6.1] - 2026-11-20
+
+Versione PATCH: nessuna funzione nuova; cambiano solo da dove il menu legge aggiornamenti e collegamenti, e il repository si allinea agli standard comuni dei progetti.
+
+### Modificato
+- **Cerca aggiornamento** legge `version.json` e `CHANGELOG.md` da `raw.githubusercontent.com` invece che dall'API di GitHub (limite di 60 richieste l'ora). Lo zip si scarica dalla radice del repository; le release non vengono più lette.
+- **`links.json` nel formato comune** e letto da `raw.githubusercontent.com`. Host controllati per collegamento: GitHub solo su github.com, Discord su discord.gg o discord.com, Ko-fi su ko-fi.com, documentazione su mashaup.github.io.
+- Nuovi collegamenti **Novità**, **Segnala un problema** e **Proponi un'idea** (modelli su GitHub) in **Sostieni › Community e aiuto**. Le icone in basso a sinistra restano GitHub, Discord, Ko-fi e Guida.
+- `version.json` contiene anche lo SHA-256 dello zip e le novità della versione.
+
+### Repository
+- `npm test` (controlli del repository, ESLint, test di unità), `npm run build` e `npm run package` al posto di `tools/package.sh` e `tools/package.ps1`.
+- Workflow `ci.yml` a ogni push e `release.yml` alla pubblicazione di una release: test, zip e SHA-256 allegati alla release, annuncio su Discord.
+- `SECURITY.md`, modelli per segnalare un problema o proporre un'idea.
+- Documentazione ridotta: README più corto; `docs/MANUTENZIONE.md` e `docs/COMPATIBILITA.md` divisi in `docs/ARCHITECTURE.md`, `docs/TEST_PLAN.md`, `docs/RELEASE.md` e `docs/SITE_NOTES.md`.
+
+Nessun permesso nuovo.
+
 ## [1.6.0] - 2026-10-24
 
 ### Aggiunto

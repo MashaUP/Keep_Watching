@@ -1,10 +1,11 @@
 'use strict';
+const { test } = require('node:test');
 const assert = require('assert/strict');
 const S = require('../../src/lib/stats.js');
 
 const at = (y, mo, d, h = 12, mi = 0, s = 0) => new Date(y, mo - 1, d, h, mi, s).getTime();
 
-module.exports = async () => {
+(async () => {
   await test('tempo di visione: somma per giorno e una sola sessione per visione continua', () => {
     const st = S.emptyStats();
     let t = at(2026, 10, 17, 21, 0);
@@ -187,4 +188,4 @@ module.exports = async () => {
     ];
     for (const [nome, file] of bad) assert.equal(S.parseImport(typeof file === 'string' ? file : JSON.stringify(file)).ok, false, nome);
   });
-};
+})();

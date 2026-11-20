@@ -3,7 +3,7 @@
 # ffmpeg (per creare i video la prima volta) e, senza schermo, xvfb-run.
 set -u
 cd "$(dirname "$0")"
-[ -f clip-90s.webm ] && [ -f clip-12min.webm ] || ./make_clips.sh
+[ -f clip-90s.webm ] && [ -f clip-12min.webm ] || sh ./make_clips.sh || { echo "Impossibile creare i video di prova (serve ffmpeg)"; exit 1; }
 python3 server.py > /tmp/kw-server.log 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT

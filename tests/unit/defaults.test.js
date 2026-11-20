@@ -1,8 +1,9 @@
 'use strict';
+const { test } = require('node:test');
 const assert = require('assert/strict');
 const D = require('../../src/defaults.js');
 
-module.exports = async () => {
+(async () => {
   await test('sanitize: chiavi mancanti e tipi sbagliati tornano ai valori di serie', () => {
     const s = D.kwSanitize({ autoNext: 'sì', quickSkip: 50, uiOpacity: 300, countdown: 5, popups: { limit: false, x: true } });
     assert.equal(s.autoNext, true);
@@ -112,4 +113,4 @@ module.exports = async () => {
     assert.equal(D.kwFormatDuration(45), '45 s');
     assert.equal(D.kwFormatDuration(7500), '2 h 05 min');
   });
-};
+})();
